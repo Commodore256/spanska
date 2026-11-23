@@ -216,3 +216,4 @@ code { background: rgba(127,127,127,.15); padding: 1px 5px; border-radius: 4px; 
 .round.yes { color: var(--good); }
 .round.undo { width: 50px; height: 50px; font-size: 1.3rem; color: var(--muted); }
 .round:disabled { opacity: .35; cursor: default; }
+.sc-es.muted { color: var(--muted); font-size: 1.1rem; font-style: italic; font-weight: 400; }

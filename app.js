@@ -647,6 +647,26 @@ async function aiExtract(text) {
   return Array.isArray(r.terms) ? r.terms : [];
 }
 
+// Översätter alla begrepp som saknar en sida (används utan AI), fyra åt gången
+async function translateTerms(terms, onProgress) {
+  const todo = terms.filter(t => !t.sv || !t.es);
+  let done = 0, next = 0;
+  async function worker() {
+    while (next < todo.length) {
+      const t = todo[next++];
+      try {
+        const r = t.es ? await freeTranslate(t.es, "es", "sv") : await freeTranslate(t.sv, "sv", "es");
+        if (r) {
+          if (t.es) { t.sv = r.text; t.filled = "sv"; } else { t.es = r.text; t.filled = "es"; }
+          t.by = r.by;
+        } else t.failed = true;
+      } catch { t.failed = true; }
+      onProgress?.(++done, todo.length);
+    }
+  }
+  await Promise.all([worker(), worker(), worker(), worker()]);
+}
+
 function showImport() {
   titleEl.textContent = "Importera";
   goBack = showMyCards; reopen = showImport;
@@ -675,7 +695,7 @@ function showImport() {
           terms = localExtract(text);
         }
       } else {
-        notice = "Utan AI blir urvalet enklare: vanliga ord tas bort och översättning görs när kortet läggs till. ";
+        notice = "Utan AI blir urvalet enklare. ";
         terms = localExtract(text);
       }
     } finally { submit.disabled = false; }
@@ -689,6 +709,13 @@ function showImport() {
       return !cards.some(c => (t.es && sameText(c.es, t.es)) || (t.sv && sameText(c.sv, t.sv)));
     });
     if (!terms.length) { status.textContent = notice + "Hittade inga nya begrepp i texten."; return; }
+    if (!usedAi && terms.some(t => !t.sv || !t.es)) {
+      submit.disabled = true;
+      status.textContent = `Översätter ${terms.length} ord…`;
+      await translateTerms(terms, (d, n) => { status.textContent = `Översätter orden… ${d} / ${n}`; });
+      submit.disabled = false;
+      notice = "Utan AI blir urvalet enklare. ";
+    }
     runSwipe(terms, usedAi, notice);
   };
 }
@@ -705,8 +732,13 @@ function runSwipe(terms, usedAi, notice) {
     const c = el("div", "swipe-card");
     c.append(el("div", "stamp yes", "LÄGG TILL"), el("div", "stamp no", "HOPPA ÖVER"));
     c.append(el("small", "lang-tag", "Español"), el("div", "sc-es", t.es || "—"));
-    c.append(el("small", "lang-tag2", "Svenska"), el("div", "sc-sv", t.sv || "översätts när kortet läggs till"));
-    if (!t.sv) c.querySelector(".sc-sv").classList.add("muted");
+    const tag = { lex: " 📖", mt: " 🌐" }[t.by] || "";
+    c.append(el("small", "lang-tag2", "Svenska"));
+    const es = c.querySelector(".sc-es"), sv = el("div", "sc-sv", t.sv || "ingen översättning hittades – du kan skriva in den sen");
+    c.append(sv);
+    if (!t.sv) sv.classList.add("muted");
+    if (!t.es) { es.textContent = "ingen översättning hittades"; es.classList.add("muted"); }
+    if (tag) (t.filled === "es" ? es : sv).append(el("small", "ai-tag", tag));
     if (t.note) c.append(el("div", "sc-note", t.note));
     if (t.es) {
       const b = el("button", "sc-speak", "🔊");
@@ -742,6 +774,7 @@ function runSwipe(terms, usedAi, notice) {
       if (add) {
         const c = newCard(t.sv, t.es);
         if (usedAi && t.sv && t.es) { c.check = { status: "ok", byAi: true }; c.filledBy = "ai"; }
+        else if (t.sv && t.es) { c.check = { status: "unchecked" }; c.filled = t.filled || null; c.filledBy = t.by || null; }
         cards.unshift(c); saveCards();
         history.push({ cardId: c.id }); added++;
       } else history.push({ cardId: null });
