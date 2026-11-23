@@ -9,6 +9,16 @@
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="style.css">
+  <script>
+    // Sätt ljust/mörkt läge direkt, innan sidan ritas (ingen blinkning).
+    // Har du inte valt själv används enhetens inställning.
+    (function () {
+      var t = null;
+      try { t = JSON.parse(localStorage.getItem("app.theme")); } catch (e) {}
+      if (t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.dataset.theme = t;
+    })();
+  </script>
 </head>
 <body>
   <header class="topbar">
@@ -210,6 +220,12 @@
 
   <template id="tpl-settings">
     <section class="settings">
+      <h2>Utseende</h2>
+      <div class="setting-row">
+        <span class="setting-text"><b>🌙 Mörkt läge</b><small class="muted">Mörk bakgrund och ljus text</small></span>
+        <label class="switch"><input id="darkToggle" type="checkbox" role="switch" aria-label="Mörkt läge"><span class="slider"></span></label>
+      </div>
+
       <h2>AI-koppling</h2>
       <p class="muted">Fyll i adressen till din Cloudflare Worker och appnyckeln (se <code>AI-INSTALLATION.md</code>).
         Görs en gång per enhet. Utan AI används en enkel gratis översättning och ingen stavningskontroll.</p>

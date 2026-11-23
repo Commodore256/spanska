@@ -1166,11 +1166,23 @@ function runWrite(deck) {
 // =====================================================================
 //  Inställningar
 // =====================================================================
+// ---------- Ljust / mörkt läge ----------
+function currentTheme() { return document.documentElement.dataset.theme === "dark" ? "dark" : "light"; }
+function setTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  save("app.theme", theme);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#8e2a20" : "#c0392b");
+}
+
 function showSettings() {
   const back = reopen || showHome;
   titleEl.textContent = "Inställningar";
   render("tpl-settings", "settings");
   goBack = back;
+  const dark = $("#darkToggle");
+  dark.checked = currentTheme() === "dark";
+  dark.onchange = () => setTheme(dark.checked ? "dark" : "light");
+
   const ai = aiConfig();
   $("#aiUrl").value = ai.url || "";
   $("#aiKey").value = ai.key || "";
