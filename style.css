@@ -217,3 +217,21 @@ code { background: rgba(127,127,127,.15); padding: 1px 5px; border-radius: 4px; 
 .round.undo { width: 50px; height: 50px; font-size: 1.3rem; color: var(--muted); }
 .round:disabled { opacity: .35; cursor: default; }
 .sc-es.muted { color: var(--muted); font-size: 1.1rem; font-style: italic; font-weight: 400; }
+
+/* ---------- 🟡 / 🗑 i övningarna ---------- */
+.practice-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.practice-head p { margin: 0; }
+.practice-tools { display: flex; gap: 8px; }
+.tool {
+  border: 2px solid rgba(127,127,127,.3); background: var(--card); color: var(--text);
+  border-radius: 10px; padding: 6px 10px; font-size: .95rem; cursor: pointer;
+}
+.tool.active { background: var(--yellow); border-color: var(--yellow); color: #333; }
+.crd .actions button.active { background: var(--yellow); border-radius: 8px; }
+@media (max-width: 380px) { .tool span { display: none; } }
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 30px); opacity: 0;
+  background: #333; color: #fff; padding: 10px 16px; border-radius: 12px; font-size: .95rem;
+  transition: opacity .2s, transform .2s; pointer-events: none; z-index: 10; max-width: 90vw; text-align: center;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }

@@ -33,6 +33,13 @@ function setBox(deckId, es, box) {
 }
 function clampBox(b) { return Math.max(0, Math.min(MAX_BOX, b)); }
 
+// Ord du tagit bort ur de färdiga lekarna (döljs, kan visas igen)
+const LS_HIDDEN = "spanska.hidden";
+let hidden = load(LS_HIDDEN, {});
+function isHidden(deckId, es) { return (hidden[deckId] || []).includes(es); }
+function hideWord(deckId, es) { hidden[deckId] = [...new Set([...(hidden[deckId] || []), es])]; save(LS_HIDDEN, hidden); }
+function visibleWords(deck) { return deck.words.filter(([es]) => !isHidden(deck.id, es)); }
+
 // =====================================================================
 //  Mina kort
 // =====================================================================
@@ -229,7 +236,7 @@ async function processQueue() {
     // Med AI kontrolleras även kort som tidigare inte kunde kontrolleras
     // (men aldrig samma kort två gånger med AI, och aldrig kort du själv godkänt)
     const todo = () => cards.find(c => c.check?.status === "pending" ||
-      (aiEnabled() && !c.check?.byAi && ["unchecked", "warn"].includes(c.check?.status)));
+      (aiEnabled() && !c.check?.byAi && !c.check?.manual && ["unchecked", "warn"].includes(c.check?.status)));
     let c, failures = 0;
     while ((c = todo()) && failures < 2) {
       c.check = { ...c.check, status: "pending" };
@@ -344,11 +351,12 @@ function showHome() {
 
   const list = $("#deckList");
   for (const deck of BUILTIN_DECKS) {
-    const boxes = deck.words.map(([es]) => getBox(deck.id, es));
+    const words = visibleWords(deck);
+    const boxes = words.map(([es]) => getBox(deck.id, es));
     const known = boxes.filter(b => b >= KNOWN_BOX).length;
-    const pct = Math.round(100 * boxes.reduce((s, b) => s + b, 0) / (deck.words.length * MAX_BOX));
+    const pct = words.length ? Math.round(100 * boxes.reduce((s, b) => s + b, 0) / (words.length * MAX_BOX)) : 0;
     const btn = el("button", "deck-btn");
-    btn.append(el("b", "", deck.name), el("span", "muted", `${deck.words.length} glosor · ${known} kan du`));
+    btn.append(el("b", "", deck.name), el("span", "muted", `${words.length} glosor · ${known} kan du`));
     const bar = el("div", "bar"), fill = el("i"); fill.style.width = pct + "%"; bar.append(fill); btn.append(bar);
     btn.onclick = () => showDeck(deck.id);
     list.appendChild(btn);
@@ -484,7 +492,12 @@ function cardRow(c) {
   const actions = el("div", "actions");
   const bSpeak = el("button", "", "🔊"); bSpeak.title = "Lyssna"; bSpeak.onclick = () => speak(c.es);
   const bEdit = el("button", "", "✏️"); bEdit.title = "Ändra"; bEdit.onclick = () => { editingId = c.id; renderCardList(); };
-  actions.append(bSpeak, bEdit);
+  const bMark = el("button", isWarn(c) ? "active" : "", "🟡");
+  bMark.title = isWarn(c) ? "Ta bort gulmarkering" : "Gulmarkera";
+  bMark.onclick = () => { toggleYellow(c); renderCardList(); };
+  const bTrash = el("button", "", "🗑"); bTrash.title = "Ta bort";
+  bTrash.onclick = () => { if (confirm(`Ta bort kortet "${c.sv} – ${c.es}"?`)) { deleteCard(c); renderCardList(); } };
+  actions.append(bSpeak, bEdit, bMark, bTrash);
 
   const stats = el("div", "stats");
   stats.title = "Övad · kunde · kunde inte";
@@ -568,12 +581,37 @@ function applyFix(c, side) {
 }
 function markOk(c) { c.check = { status: "ok" }; saveCards(); renderCardList(); }
 
+// Gulmarkera för hand / ta bort gulmarkeringen. Returnerar true om kortet nu är gult.
+function toggleYellow(c) {
+  if (isWarn(c) && c.sv && c.es) {
+    c.check = c.check?.manual ? (c.check.prev || { status: "ok" }) : { status: "ok" };
+  } else if (!isWarn(c)) {
+    c.check = { status: "warn", manual: true, note: "Gulmarkerad av dig.", prev: c.check };
+  }
+  saveCards();
+  return isWarn(c);
+}
+function deleteCard(c) { cards = cards.filter(x => x.id !== c.id); saveCards(); }
+
+let toastTimer = null;
+function toast(text) {
+  const t = document.getElementById("toast");
+  t.textContent = text;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+}
+
 // Gör om Mina kort till en "lek" för övningarna
 function myCardsDeck(list) {
   return {
     id: "mina", name: "Mina kort", back: showMyCards,
     items: list.map(c => ({
-      sv: c.sv, es: c.es,
+      id: c.id, sv: c.sv, es: c.es,
+      isYellow: () => isWarn(c),
+      toggleYellow: () => toggleYellow(c),
+      yellowText: on => on ? "🟡 Gulmarkerad – finns under 🟡 Att rätta" : "Gulmarkeringen borttagen",
+      remove: () => deleteCard(c),
       box: () => c.box,
       record: ok => {
         c.seen++; c.lastSeen = Date.now();
@@ -586,8 +624,17 @@ function myCardsDeck(list) {
 function builtinDeck(deck) {
   return {
     id: deck.id, name: deck.name, back: () => showDeck(deck.id),
-    items: deck.words.map(([es, sv]) => ({
-      sv, es,
+    items: visibleWords(deck).map(([es, sv]) => ({
+      id: deck.id + ":" + es, sv, es,
+      // Gulmarkering av ett ord i en färdig lek: ordet kopieras till Mina kort som gult kort
+      isYellow: () => cards.some(c => sameText(c.es, es) && isWarn(c)),
+      toggleYellow: () => {
+        let c = cards.find(x => sameText(x.es, es));
+        if (!c) { c = newCard(sv, es); c.check = { status: "ok" }; cards.unshift(c); }
+        return toggleYellow(c);
+      },
+      yellowText: on => on ? "🟡 Kopierad till Mina kort som gult kort" : "Gulmarkeringen borttagen i Mina kort",
+      remove: () => hideWord(deck.id, es),
       box: () => getBox(deck.id, es),
       record: ok => setBox(deck.id, es, ok ? getBox(deck.id, es) + 1 : 0)
     }))
@@ -855,8 +902,16 @@ function showDeck(deckId) {
   goBack = showHome; reopen = () => showDeck(deckId);
   render("tpl-deck", "deck");
   $("#deckName").textContent = deck.name;
-  const known = deck.words.filter(([es]) => getBox(deck.id, es) >= KNOWN_BOX).length;
-  $("#deckStats").textContent = `${deck.words.length} glosor · ${known} kan du`;
+  const words = visibleWords(deck);
+  const known = words.filter(([es]) => getBox(deck.id, es) >= KNOWN_BOX).length;
+  $("#deckStats").textContent = `${words.length} glosor · ${known} kan du`;
+  const nHidden = deck.words.length - words.length;
+  if (nHidden) {
+    const bu = $("#btnUnhide");
+    bu.textContent = `Visa ${nHidden} borttagna ord igen`;
+    bu.classList.remove("hidden");
+    bu.onclick = () => { delete hidden[deck.id]; save(LS_HIDDEN, hidden); showDeck(deck.id); };
+  }
   const d = builtinDeck(deck);
   view.querySelectorAll(".mode").forEach(b => {
     b.onclick = () => {
@@ -881,7 +936,7 @@ function showList(deck) {
   render("tpl-list", "list");
   goBack = () => showDeck(deck.id); reopen = () => showList(deck);
   const ul = $("#wordList");
-  for (const [es, sv] of deck.words) {
+  for (const [es, sv] of visibleWords(deck)) {
     const li = el("li");
     const b = el("button", "", "🔊"); b.title = "Lyssna"; b.onclick = () => speak(es);
     li.append(b, el("span", "sv", sv), el("span", "es", es), el("span", "box", "★".repeat(getBox(deck.id, es))));
@@ -909,16 +964,41 @@ function showDone(deck, text, again) {
   $("#btnBack").onclick = deck.back;
 }
 
+// 🟡- och 🗑-knapparna i övningarna
+function practiceTools(getCur, onRemoved) {
+  const bMark = $("#btnMark"), bTrash = $("#btnTrash");
+  const refresh = () => { const cur = getCur(); bMark.classList.toggle("active", !!cur && cur.item.isYellow()); };
+  bMark.onclick = () => {
+    const cur = getCur(); if (!cur) return;
+    const on = cur.item.toggleYellow();
+    toast(cur.item.yellowText(on));
+    refresh();
+  };
+  bTrash.onclick = () => {
+    const cur = getCur(); if (!cur) return;
+    if (!confirm(`Ta bort kortet "${cur.item.sv} – ${cur.item.es}"?`)) return;
+    cur.item.remove();
+    toast("🗑 Kortet borttaget");
+    onRemoved(cur.item.id);
+  };
+  return refresh;
+}
+function dropFromQueue(queue, id) {
+  for (let i = queue.length - 1; i >= 0; i--) if (queue[i].item.id === id) queue.splice(i, 1);
+}
+
 function runCards(deck) {
   render("tpl-cards", "cards");
   goBack = deck.back; reopen = deck.back;
   const queue = buildSession(deck), total = queue.length;
   let right = 0, cur = null, flipped = false;
   const front = $("#cardFront"), back = $("#cardBack"), tag = $("#cardLang");
+  const refreshTools = practiceTools(() => cur, id => { dropFromQueue(queue, id); next(); });
 
   function next() {
     if (!queue.length) return showDone(deck, `Du kunde ${right} av ${total} på första försöket.`, () => runCards(deck));
     cur = queue.shift(); flipped = false;
+    refreshTools();
     const { item, showSv } = cur;
     tag.textContent = showSv ? LANG_NAME.sv : LANG_NAME.es;
     front.textContent = showSv ? item.sv : item.es;
@@ -954,10 +1034,12 @@ function runWrite(deck) {
   const queue = buildSession(deck), total = queue.length;
   let right = 0, cur = null, answered = false;
   const input = $("#answer"), feedback = $("#feedback"), btnNext = $("#btnNext");
+  const refreshTools = practiceTools(() => cur, id => { dropFromQueue(queue, id); next(); });
 
   function next() {
     if (!queue.length) return showDone(deck, `Du hade ${right} av ${total} rätt på första försöket.`, () => runWrite(deck));
     cur = queue.shift(); answered = false;
+    refreshTools();
     const { item, showSv } = cur;
     $("#promptLang").textContent = (showSv ? LANG_NAME.sv : LANG_NAME.es) + " → " + (showSv ? LANG_NAME.es : LANG_NAME.sv);
     $("#prompt").textContent = showSv ? item.sv : item.es;

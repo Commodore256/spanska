@@ -19,6 +19,7 @@
   </header>
 
   <main id="view"></main>
+  <div id="toast" class="toast"></div>
 
   <!-- Startsida -->
   <template id="tpl-home">
@@ -144,12 +145,18 @@
         <button class="mode" data-mode="list"><span>📋</span>Ordlista<small>Se och lyssna</small></button>
       </div>
       <button id="btnCopyDeck" class="btn ghost">Kopiera lekens ord till Mina kort</button>
+      <button id="btnUnhide" class="btn ghost hidden"></button>
     </section>
   </template>
 
   <template id="tpl-cards">
     <section class="cards">
-      <p id="progress" class="muted"></p>
+      <div class="practice-head"><p id="progress" class="muted"></p>
+      <div class="practice-tools">
+        <button id="btnMark" class="tool" title="Gulmarkera kortet">🟡 <span>Gulmarkera</span></button>
+        <button id="btnTrash" class="tool" title="Ta bort kortet">🗑 <span>Ta bort</span></button>
+      </div>
+      </div>
       <div id="card" class="card" tabindex="0">
         <small id="cardLang" class="lang-tag"></small>
         <div id="cardFront" class="card-text"></div>
@@ -168,7 +175,12 @@
 
   <template id="tpl-write">
     <section class="write">
-      <p id="progress" class="muted"></p>
+      <div class="practice-head"><p id="progress" class="muted"></p>
+      <div class="practice-tools">
+        <button id="btnMark" class="tool" title="Gulmarkera kortet">🟡 <span>Gulmarkera</span></button>
+        <button id="btnTrash" class="tool" title="Ta bort kortet">🗑 <span>Ta bort</span></button>
+      </div>
+      </div>
       <div class="card static">
         <small id="promptLang" class="lang-tag"></small>
         <div id="prompt" class="card-text"></div>
