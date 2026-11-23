@@ -1,6 +1,6 @@
 // Service worker: gör att appen fungerar offline.
 // Höj versionen när du ändrar filerna, så laddas den nya versionen ner.
-const CACHE = "spanska-v1";
+const CACHE = "spanska-v2";
 const FILES = [
   "./",
   "./index.html",

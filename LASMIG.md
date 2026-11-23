@@ -9,6 +9,11 @@ En PWA (installerbar webbapp) för att öva spanska glosor.
 
 Att dubbelklicka direkt på `index.html` fungerar också för att öva, men då går appen inte att installera eller köra offline.
 
+## Ladda upp en ny version
+Dubbelklicka på `publicera.bat`. Den räknar upp versionsnumret i `version.js` (v1 → v2 …),
+gör en commit och pushar till GitHub. Versionen syns uppe i appens titelrad.
+Stäng och öppna appen på enheterna för att få den nya versionen.
+
 ## Funktioner
 - **Flashcards**: vänd kortet, säg om du kunde eller inte. Ord du inte kan kommer tillbaka snart.
 - **Skrivförhör**: se svenska, skriv spanska. Accentknappar (á é í ó ú ñ ¿ ¡). Fel accent räknas som "nästan".
@@ -27,7 +32,9 @@ Progress sparas i webbläsaren på varje enhet (localStorage).
 | `app.js` | All logik |
 | `words.js` | De inbyggda glosorna – lägg till fler lekar här |
 | `manifest.json` | Gör den installerbar, helskärm, ikon |
-| `sw.js` | Offline-stöd. Höj `CACHE`-versionen när du ändrar filer |
+| `sw.js` | Offline-stöd (cachen följer versionsnumret) |
+| `version.js` | Versionsnumret – räknas upp av `publicera.bat` |
+| `publicera.bat` / `publicera.ps1` | Räknar upp versionen och laddar upp till GitHub |
 | `starta.bat` / `server.ps1` | Lokal testserver för Windows |
 
 ## Nästa steg

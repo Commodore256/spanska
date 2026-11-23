@@ -39,8 +39,12 @@ function allDecks() {
 }
 function deckById(id) { return allDecks().find(d => d.id === id); }
 function deckStats(deck) {
-  const learned = deck.words.filter(([es]) => getBox(deck.id, es) >= 3).length;
-  return { learned, total: deck.words.length };
+  const boxes = deck.words.map(([es]) => getBox(deck.id, es));
+  const learned = boxes.filter(b => b >= 3).length;           // rätt minst 3 gånger
+  const practiced = boxes.filter(b => b >= 1).length;         // rätt minst 1 gång
+  const total = deck.words.length;
+  const percent = total ? Math.round(100 * boxes.reduce((s, b) => s + b, 0) / (total * MAX_BOX)) : 0;
+  return { learned, practiced, total, percent };
 }
 
 // ---------- Uttal ----------
@@ -112,11 +116,11 @@ function showHome() {
   render("tpl-home");
   const list = $("#deckList");
   for (const deck of allDecks()) {
-    const { learned, total } = deckStats(deck);
+    const { learned, practiced, total, percent } = deckStats(deck);
     const btn = document.createElement("button");
     btn.className = "deck-btn";
-    btn.innerHTML = `<b></b><span class="muted">${learned} av ${total} kan du</span>
-      <div class="bar"><i style="width:${total ? (100 * learned / total) : 0}%"></i></div>`;
+    btn.innerHTML = `<b></b><span class="muted">${total} glosor · ${practiced} rätt någon gång · ${learned} sitter</span>
+      <div class="bar"><i style="width:${percent}%"></i></div>`;
     btn.querySelector("b").textContent = deck.name;
     btn.onclick = () => showDeck(deck.id);
     list.appendChild(btn);
@@ -134,8 +138,9 @@ function showDeck(deckId) {
   title.textContent = deck.name.replace("✏️ ", "");
   render("tpl-deck");
   $("#deckName").textContent = deck.name;
-  const { learned, total } = deckStats(deck);
-  $("#deckStats").textContent = `${total} glosor · ${learned} kan du`;
+  const { learned, practiced, total, percent } = deckStats(deck);
+  $("#deckStats").textContent =
+    `${total} glosor · ${practiced} rätt någon gång · ${learned} sitter (rätt 3 gånger) · ${percent} % klart`;
   const toggle = $("#dirToggle");
   toggle.checked = load(LS_SVFIRST, false);
   toggle.onchange = () => save(LS_SVFIRST, toggle.checked);
