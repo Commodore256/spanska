@@ -18,7 +18,11 @@ Stäng och öppna appen på enheterna för att få den nya versionen.
 - **Flashcards**: vänd kortet, säg om du kunde eller inte. Ord du inte kan kommer tillbaka snart.
 - **Skrivförhör**: se svenska, skriv spanska. Accentknappar (á é í ó ú ñ ¿ ¡). Fel accent räknas som "nästan".
 - **Ordlista**: alla ord med uppläsning och stjärnor för hur bra du kan dem.
-- **Mina glosor**: skriv in egna glosor, en per rad: `el perro = hunden`.
+- **Mina kort**: två rutor (svenska | español). Skriv i en eller båda – tom ruta fylls i av AI:n.
+  Stavfel markeras gult med "Menar du …?" och en Använd-knapp. Filter (🟡 att rätta, 🟢 kan, ⚪ aldrig övade,
+  🔴 svåra, ⏳ ej kontrollerade), sortering och statistik per kort (övad / ✓ kunde / ✗ kunde inte).
+  Övningarna använder korten som syns i listan, och frågar åt båda hållen.
+- **AI**: se `..\ai-worker\AI-INSTALLATION.md`. Kopplas in under ⚙ på varje enhet.
 - **Uttal**: 🔊 läser upp på spanska med webbläsarens röst.
 - **Helskärm**: knappen ⛶ uppe till höger.
 
@@ -39,5 +43,4 @@ Progress sparas i webbläsaren på varje enhet (localStorage).
 
 ## Nästa steg
 - Steg 2: lägg upp på GitHub Pages så den kan installeras på Chromebook och Android.
-- Steg 3: Cloudflare Worker + "fråga om ett ord" med AI.
 - Senare: glosor efter kapitlen i Caminando 3.

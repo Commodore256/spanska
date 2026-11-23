@@ -12,34 +12,95 @@
 </head>
 <body>
   <header class="topbar">
-    <button id="btnHome" class="icon-btn" title="Hem" aria-label="Hem">⌂</button>
+    <button id="btnHome" class="icon-btn" title="Tillbaka" aria-label="Tillbaka">⌂</button>
     <h1><span id="title">¡Hola! Spanska</span> <small id="version" class="version"></small></h1>
+    <button id="btnSettings" class="icon-btn" title="Inställningar" aria-label="Inställningar">⚙</button>
     <button id="btnFull" class="icon-btn" title="Helskärm" aria-label="Helskärm">⛶</button>
   </header>
 
   <main id="view"></main>
 
+  <!-- Startsida -->
   <template id="tpl-home">
     <section class="home">
-      <p class="lead">Välj glosor att öva på</p>
+      <button id="btnMyCards" class="deck-btn mine">
+        <b>📒 Mina kort</b>
+        <span id="myCardsInfo" class="muted"></span>
+        <div class="bar"><i id="myCardsBar"></i></div>
+      </button>
+      <p class="lead">Färdiga övningslekar</p>
       <div id="deckList" class="deck-list"></div>
       <div class="home-actions">
-        <button id="btnMyWords" class="btn secondary">✏️ Mina glosor</button>
+        <button id="btnUpdate" class="btn ghost">🔄 Uppdatera appen</button>
         <button id="btnReset" class="btn ghost">Nollställ progress</button>
       </div>
     </section>
   </template>
 
+  <!-- Mina kort: lägg till, lista, filter -->
+  <template id="tpl-mycards">
+    <section class="mycards">
+      <form id="addForm" class="add-form" autocomplete="off">
+        <div class="add-cols">
+          <label>Svenska<input id="inSv" type="text" lang="sv" placeholder="t.ex. att hjälpa" spellcheck="false"></label>
+          <label>Español<input id="inEs" type="text" lang="es" placeholder="t.ex. ayudar" spellcheck="false" autocapitalize="off"></label>
+        </div>
+        <div class="accents" data-target="inEs">
+          <button type="button" data-ch="á">á</button><button type="button" data-ch="é">é</button>
+          <button type="button" data-ch="í">í</button><button type="button" data-ch="ó">ó</button>
+          <button type="button" data-ch="ú">ú</button><button type="button" data-ch="ñ">ñ</button>
+          <button type="button" data-ch="ü">ü</button><button type="button" data-ch="¿">¿</button>
+          <button type="button" data-ch="¡">¡</button>
+        </div>
+        <div class="add-row">
+          <button class="btn good" type="submit">＋ Lägg till</button>
+          <span id="aiStatus" class="ai-status"></span>
+        </div>
+        <p class="muted small">Skriv i en ruta eller båda. Tom ruta fylls i av AI:n. Stavfel markeras gult så du kan rätta dem sen.</p>
+      </form>
+
+      <div class="filters" id="filters">
+        <button data-filter="all" class="chip active">Alla</button>
+        <button data-filter="warn" class="chip yellow">🟡 Att rätta</button>
+        <button data-filter="known" class="chip green">🟢 Kan</button>
+        <button data-filter="never" class="chip">⚪ Aldrig övade</button>
+        <button data-filter="hard" class="chip red">🔴 Svåra</button>
+        <button data-filter="unchecked" class="chip">⏳ Ej kontrollerade</button>
+      </div>
+      <div class="list-tools">
+        <label>Sortera
+          <select id="sortSel">
+            <option value="new">Nyast först</option>
+            <option value="never">Aldrig övade först</option>
+            <option value="practiced">Mest övade först</option>
+            <option value="wrong">Flest fel först</option>
+            <option value="sv">Svenska A–Ö</option>
+            <option value="es">Español A–Z</option>
+          </select>
+        </label>
+        <span id="listCount" class="muted"></span>
+      </div>
+      <div class="practice-row">
+        <button class="btn secondary" data-practice="cards">🃏 Flashcards</button>
+        <button class="btn secondary" data-practice="write">⌨️ Skrivförhör</button>
+      </div>
+      <p class="muted small center">Övningen använder korten som visas i listan just nu.</p>
+
+      <ul id="cardList" class="card-list"></ul>
+    </section>
+  </template>
+
+  <!-- Färdig lek -->
   <template id="tpl-deck">
     <section class="deck">
       <h2 id="deckName"></h2>
       <p id="deckStats" class="muted"></p>
       <div class="mode-grid">
         <button class="mode" data-mode="cards"><span>🃏</span>Flashcards<small>Vänd kortet</small></button>
-        <button class="mode" data-mode="write"><span>⌨️</span>Skrivförhör<small>Skriv på spanska</small></button>
+        <button class="mode" data-mode="write"><span>⌨️</span>Skrivförhör<small>Skriv översättningen</small></button>
         <button class="mode" data-mode="list"><span>📋</span>Ordlista<small>Se och lyssna</small></button>
       </div>
-      <label class="toggle"><input type="checkbox" id="dirToggle"> Visa svenska först (på flashcards)</label>
+      <button id="btnCopyDeck" class="btn ghost">Kopiera lekens ord till Mina kort</button>
     </section>
   </template>
 
@@ -47,6 +108,7 @@
     <section class="cards">
       <p id="progress" class="muted"></p>
       <div id="card" class="card" tabindex="0">
+        <small id="cardLang" class="lang-tag"></small>
         <div id="cardFront" class="card-text"></div>
         <div id="cardBack" class="card-text back hidden"></div>
         <small class="hint">Tryck för att vända</small>
@@ -65,11 +127,12 @@
     <section class="write">
       <p id="progress" class="muted"></p>
       <div class="card static">
+        <small id="promptLang" class="lang-tag"></small>
         <div id="prompt" class="card-text"></div>
       </div>
       <form id="writeForm" class="write-form" autocomplete="off">
-        <input id="answer" type="text" placeholder="Skriv på spanska…" autocapitalize="off" spellcheck="false" lang="es">
-        <div class="accents">
+        <input id="answer" type="text" autocapitalize="off" spellcheck="false">
+        <div class="accents" data-target="answer">
           <button type="button" data-ch="á">á</button><button type="button" data-ch="é">é</button>
           <button type="button" data-ch="í">í</button><button type="button" data-ch="ó">ó</button>
           <button type="button" data-ch="ú">ú</button><button type="button" data-ch="ñ">ñ</button>
@@ -89,15 +152,24 @@
     </section>
   </template>
 
-  <template id="tpl-mywords">
-    <section class="mywords">
-      <h2>Mina glosor</h2>
-      <p class="muted">En glosa per rad: <code>spanska = svenska</code>. Till exempel <code>el perro = hunden</code></p>
-      <textarea id="myText" rows="12" spellcheck="false"></textarea>
+  <template id="tpl-settings">
+    <section class="settings">
+      <h2>AI-koppling</h2>
+      <p class="muted">Fyll i adressen till din Cloudflare Worker och appnyckeln (se <code>AI-INSTALLATION.md</code>).
+        Görs en gång per enhet. Utan AI används en enkel gratis översättning och ingen stavningskontroll.</p>
+      <label class="field">Worker-adress<input id="aiUrl" type="url" placeholder="https://spanska-ai.DITTNAMN.workers.dev"></label>
+      <label class="field">Appnyckel<input id="aiKey" type="password" placeholder="den hemliga appnyckeln"></label>
       <div class="row">
-        <button id="btnSaveMy" class="btn good">Spara</button>
+        <button id="btnSaveAi" class="btn good">Spara</button>
+        <button id="btnTestAi" class="btn secondary">Testa</button>
       </div>
-      <p id="mySaved" class="muted"></p>
+      <p id="aiTestResult" class="muted center"></p>
+      <h2>Övningsriktning</h2>
+      <select id="dirSel">
+        <option value="mix">Blandat – båda hållen</option>
+        <option value="sv2es">Svenska → spanska</option>
+        <option value="es2sv">Spanska → svenska</option>
+      </select>
     </section>
   </template>
 
