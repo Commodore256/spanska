@@ -22,6 +22,10 @@ Stäng och öppna appen på enheterna för att få den nya versionen.
 - **Flashcards**: vänd kortet, säg om du kunde eller inte. Ord du inte kan kommer tillbaka snart.
 - **Skrivförhör**: se svenska, skriv spanska. Accentknappar (á é í ó ú ñ ¿ ¡). Fel accent räknas som "nästan".
 - **Ordlista**: alla ord med uppläsning och stjärnor för hur bra du kan dem.
+- **Kategorier** (📁 överst i Mina kort): huvudkategorier med underkategorier, t.ex. Caminando 3 › Kapitel 1.
+  Nya och importerade kort hamnar i vald kategori, och övningarna använder bara korten i den. "Hantera kategorier"
+  för att lägga till, byta namn och ta bort. Flytta ett kort med ✏️.
+- **Spanska steg 3** (startsidan): sex färdiga lekar med egna ord på steg 3-teman – inte bokens ordlistor.
 - **Mina kort**: två rutor (svenska | español). Skriv i en eller båda – tom ruta fylls i av AI:n.
   Stavfel markeras gult med "Menar du …?" och en Använd-knapp. Filter (🟡 att rätta, 🟢 kan, ⚪ aldrig övade,
   🔴 svåra, ⏳ ej kontrollerade), sortering och statistik per kort (övad / ✓ kunde / ✗ kunde inte).

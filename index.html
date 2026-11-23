@@ -64,6 +64,13 @@
   <!-- Mina kort: lägg till, lista, filter -->
   <template id="tpl-mycards">
     <section class="mycards">
+      <div class="cat-bar">
+        <label class="cat-label">📁
+          <select id="catSel" aria-label="Kategori"></select>
+        </label>
+        <button id="btnCats" class="btn-small" type="button">Hantera kategorier</button>
+      </div>
+      <p id="catHint" class="muted small cat-hint"></p>
       <form id="addForm" class="add-form" autocomplete="off">
         <div class="add-cols">
           <label><span id="lblSv">Svenska</span><input id="inSv" type="text" lang="sv" placeholder="t.ex. att hjälpa" spellcheck="false"></label>
@@ -115,6 +122,7 @@
       <h2>Importera flashcards från text 📋</h2>
       <p class="muted">Klistra in en text, till exempel från läroboken eller en uppgift. AI:n plockar ut de viktiga
         begreppen, och sen sveper du höger på de kort du vill ha.</p>
+      <p id="importCat" class="muted small"></p>
       <textarea id="importText" rows="12" placeholder="Klistra in texten här…" spellcheck="false"></textarea>
       <p id="importCount" class="muted small"></p>
       <div class="row">
@@ -242,6 +250,17 @@
         <option value="sv2es" id="optSv2Es">Svenska → målspråket</option>
         <option value="es2sv" id="optEs2Sv">Målspråket → svenska</option>
       </select>
+    </section>
+  </template>
+
+  <!-- Hantera kategorier -->
+  <template id="tpl-cats">
+    <section class="cats">
+      <h2>Kategorier</h2>
+      <p class="muted">Huvudkategorier, t.ex. en lärobok, med underkategorier, t.ex. kapitel. Kort du lägger till eller
+        importerar hamnar i den kategori du har valt i Mina kort.</p>
+      <ul id="catList" class="cat-list"></ul>
+      <button id="btnNewMainCat" class="btn good">＋ Ny huvudkategori</button>
     </section>
   </template>
 

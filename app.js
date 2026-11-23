@@ -58,6 +58,7 @@ function saveConfigs() { save("app.configs", configs); }
 //  Data för aktiv konfig
 // =====================================================================
 let progress = {}, hidden = {}, cards = [], listFilter = "all", listSort = "new";
+let cats = [], listCat = "all";   // kategorier i Mina kort och vald kategori ("all", "none" eller id)
 
 function getBox(deckId, es) { return (progress[deckId] && progress[deckId][es]) || 0; }
 function setBox(deckId, es, box) {
@@ -114,6 +115,49 @@ function loadConfigData() {
   cards = loadCards();
   listFilter = load(lsKey("filter"), "all");
   listSort = load(lsKey("sort"), "new");
+  cats = load(lsKey("cats"), null);
+  if (!Array.isArray(cats)) {
+    // Spanska får en färdig huvudkategori för läroboken
+    cats = activeId === "spanska"
+      ? [{ id: "caminando3", name: "Caminando 3", parent: null }, { id: "caminando3-k1", name: "Kapitel 1", parent: "caminando3" }]
+      : [];
+    save(lsKey("cats"), cats);
+  }
+  listCat = load(lsKey("listCat"), "all");
+  if (listCat !== "all" && listCat !== "none" && !cats.some(c => c.id === listCat)) listCat = "all";
+}
+
+// ---------- Kategorier ----------
+function saveCats() { save(lsKey("cats"), cats); }
+function catById(id) { return cats.find(c => c.id === id); }
+function catLabel(id) {
+  const c = catById(id); if (!c) return "";
+  const p = c.parent ? catById(c.parent) : null;
+  return p ? `${p.name} › ${c.name}` : c.name;
+}
+function mainCats() { return cats.filter(c => !c.parent); }
+function subCats(id) { return cats.filter(c => c.parent === id); }
+// Kategorin som nya kort hamnar i (den som är vald i Mina kort)
+function catForNew() { return catById(listCat) ? listCat : null; }
+function inCat(card, id) {
+  if (id === "all") return true;
+  if (id === "none") return !card.cat || !catById(card.cat);
+  return card.cat === id || catById(card.cat)?.parent === id;
+}
+function newCatId(name) {
+  return name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "").slice(0, 20) + "-" + Math.random().toString(36).slice(2, 6);
+}
+function fillCatSelect(sel, { withAll = false, value = null } = {}) {
+  sel.innerHTML = "";
+  const add = (v, text) => { const o = el("option", "", text); o.value = v; sel.append(o); };
+  if (withAll) add("all", "Alla kort");
+  add("none", withAll ? "Utan kategori" : "— Ingen kategori —");
+  for (const m of mainCats()) {
+    add(m.id, m.name);
+    for (const sc of subCats(m.id)) add(sc.id, "   › " + sc.name);
+  }
+  sel.value = value ?? (withAll ? "all" : "none");
 }
 loadConfigData();
 function saveCards() { save(lsKey("cards"), cards); }
@@ -412,7 +456,15 @@ function showHome() {
 
   const list = $("#deckList");
   if (!hasBuiltinDecks()) { $(".lead").classList.add("hidden"); list.classList.add("hidden"); }
+  let lastGroup = null;
   for (const deck of hasBuiltinDecks() ? BUILTIN_DECKS : []) {
+    const group = deck.group || "Grundord";
+    if (group !== lastGroup) {
+      const h = el("h3", "deck-group", group);
+      if (group === "Spanska steg 3") h.append(el("small", "muted", " – egna ord på steg 3-teman"));
+      list.appendChild(h);
+      lastGroup = group;
+    }
     const words = visibleWords(deck);
     const boxes = words.map(([es]) => getBox(deck.id, es));
     const known = boxes.filter(b => b >= KNOWN_BOX).length;
@@ -455,7 +507,7 @@ function filteredCards() {
     sv: (a, b) => coll(a, b, "sv", "sv"),
     es: (a, b) => coll(a, b, "es", "es")
   }[listSort] || (() => 0);
-  return cards.filter(f).sort(s);
+  return cards.filter(c => inCat(c, listCat) && f(c)).sort(s);
 }
 
 function showMyCards() {
@@ -483,11 +535,24 @@ function showMyCards() {
 
   $("#btnImport").onclick = showImport;
 
+  // Kategori: vilka kort som visas, och var nya kort hamnar
+  const catSel = $("#catSel");
+  fillCatSelect(catSel, { withAll: true, value: listCat });
+  const updateCatHint = () => {
+    $("#catHint").textContent = catForNew()
+      ? `Nya och importerade kort hamnar i ${catLabel(catForNew())}.`
+      : (listCat === "none" ? "Visar kort utan kategori." : "Visar alla kort. Välj en kategori för att lägga kort i den.");
+  };
+  updateCatHint();
+  catSel.onchange = () => { listCat = catSel.value; save(lsKey("listCat"), listCat); updateCatHint(); renderCardList(); };
+  $("#btnCats").onclick = showCats;
+
   $("#addForm").onsubmit = e => {
     e.preventDefault();
     const sv = inSv.value.trim(), es = inEs.value.trim();
     if (!sv && !es) { inSv.focus(); return; }
-    cards.unshift(newCard(sv, es));
+    const nc = newCard(sv, es); nc.cat = catForNew();
+    cards.unshift(nc);
     saveCards();
     inSv.value = ""; inEs.value = "";
     (sv ? inSv : inEs).focus();
@@ -575,6 +640,7 @@ function cardRow(c) {
   const stats = el("div", "stats");
   stats.title = "Övad · kunde · kunde inte";
   stats.innerHTML = `<span>Övad <b>${c.seen}</b></span><span class="ok">✓ <b>${c.right}</b></span><span class="no">✗ <b>${c.wrong}</b></span>`;
+  if (c.cat && catById(c.cat) && listCat === "all") stats.append(el("span", "cat-tag", "📁 " + catLabel(c.cat)));
   if (c.check?.status === "pending") stats.append(el("span", "pend", "⏳"));
   else if (c.check?.status === "ok") stats.append(el("span", "chk", "✔︎ kontrollerad"));
 
@@ -619,6 +685,8 @@ function cardEditRow(c) {
   const bCancel = el("button", "btn-small", "Avbryt");
   const bDel = el("button", "btn-small bad", "🗑 Ta bort");
   bSave.onclick = () => {
+    const newCat = catSel.value === "none" ? null : catSel.value;
+    if ((c.cat || null) !== newCat) { c.cat = newCat; saveCards(); }
     const nsv = sv.value.trim(), nes = es.value.trim();
     if (nsv !== c.sv || nes !== c.es) {
       if (nsv !== c.sv && c.filled === "sv") c.filled = null;
@@ -640,7 +708,11 @@ function cardEditRow(c) {
     if (e.key === "Escape") bCancel.onclick();
   });
   btns.append(bSave, bCancel, bDel);
-  li.append(cols, btns);
+  const catRow = el("label", "fix-row edit-cat", "📁 ");
+  const catSel = el("select");
+  fillCatSelect(catSel, { value: c.cat && catById(c.cat) ? c.cat : "none" });
+  catRow.append(catSel);
+  li.append(cols, catRow, btns);
   setTimeout(() => sv.focus(), 0);
   return li;
 }
@@ -712,6 +784,62 @@ function builtinDeck(deck) {
       box: () => getBox(deck.id, es),
       record: ok => setBox(deck.id, es, ok ? getBox(deck.id, es) + 1 : 0)
     }))
+  };
+}
+
+// =====================================================================
+//  Hantera kategorier
+// =====================================================================
+function askName(question, current = "") {
+  const n = prompt(question, current);
+  return n && n.trim() ? n.trim().slice(0, 40) : null;
+}
+function cardsInCat(id) { return cards.filter(c => inCat(c, id)).length; }
+
+function showCats() {
+  titleEl.textContent = "Kategorier";
+  goBack = showMyCards; reopen = showCats;
+  render("tpl-cats", "cats");
+  const ul = $("#catList");
+  const row = (c, isSub) => {
+    const li = el("li", isSub ? "cat-item sub" : "cat-item");
+    li.append(el("span", "cat-name", (isSub ? "› " : "📁 ") + c.name), el("small", "muted", `${cardsInCat(c.id)} kort`));
+    const btns = el("span", "cat-btns");
+    if (!isSub) {
+      const add = el("button", "btn-small", "＋ Underkategori");
+      add.onclick = () => {
+        const n = askName(`Namn på underkategorin i ${c.name}:`, `Kapitel ${subCats(c.id).length + 1}`);
+        if (!n) return;
+        cats.push({ id: newCatId(n), name: n, parent: c.id }); saveCats(); showCats();
+      };
+      btns.append(add);
+    }
+    const ren = el("button", "btn-small", "✏️"); ren.title = "Byt namn";
+    ren.onclick = () => { const n = askName("Nytt namn:", c.name); if (n) { c.name = n; saveCats(); showCats(); } };
+    const del = el("button", "btn-small", "🗑"); del.title = "Ta bort kategorin";
+    del.onclick = () => {
+      const n = cardsInCat(c.id);
+      const what = isSub ? "" : " och dess underkategorier";
+      if (!confirm(`Ta bort kategorin "${c.name}"${what}? Korten (${n} st) finns kvar, men utan kategori.`)) return;
+      const ids = new Set([c.id, ...subCats(c.id).map(x => x.id)]);
+      cards.forEach(card => { if (ids.has(card.cat)) card.cat = null; });
+      cats = cats.filter(x => !ids.has(x.id));
+      if (ids.has(listCat)) { listCat = "all"; save(lsKey("listCat"), listCat); }
+      saveCats(); saveCards(); showCats();
+    };
+    btns.append(ren, del);
+    li.append(btns);
+    return li;
+  };
+  if (!mainCats().length) ul.append(el("li", "muted empty", "Inga kategorier än."));
+  for (const m of mainCats()) {
+    ul.append(row(m, false));
+    for (const sc of subCats(m.id)) ul.append(row(sc, true));
+  }
+  $("#btnNewMainCat").onclick = () => {
+    const n = askName("Namn på huvudkategorin (t.ex. en lärobok):");
+    if (!n) return;
+    cats.push({ id: newCatId(n), name: n, parent: null }); saveCats(); showCats();
   };
 }
 
@@ -796,6 +924,7 @@ function showImport() {
   goBack = showMyCards; reopen = showImport;
   render("tpl-import", "import");
   const ta = $("#importText"), count = $("#importCount"), status = $("#importStatus"), submit = $("#btnSubmitText");
+  $("#importCat").textContent = catForNew() ? `📁 Korten hamnar i: ${catLabel(catForNew())}` : "📁 Korten hamnar utan kategori (välj kategori i Mina kort).";
   ta.value = load(lsKey("importDraft"), "");
   const updateCount = () => {
     const n = ta.value.length;
@@ -899,7 +1028,7 @@ function runSwipe(terms, usedAi, notice) {
     setTimeout(() => {
       const t = terms[index];
       if (add) {
-        const c = newCard(t.sv, t.es);
+        const c = newCard(t.sv, t.es); c.cat = catForNew();
         if (usedAi && t.sv && t.es) { c.check = { status: "ok", byAi: true }; c.filledBy = "ai"; }
         else if (t.sv && t.es) { c.check = { status: "unchecked" }; c.filled = t.filled || null; c.filledBy = t.by || null; }
         cards.unshift(c); saveCards();
@@ -1316,7 +1445,7 @@ function showConfigEdit(id) {
     if (!existing || configs.length < 2) return;
     const n = (load(keyFor(existing.id, "cards"), []) || []).length;
     if (!confirm(`Ta bort konfigen "${existing.name}" och alla dess ${n} kort? Det går inte att ångra.`)) return;
-    for (const base of ["cards", "progress", "hidden", "filter", "sort", "dir", "importDraft"]) {
+    for (const base of ["cards", "progress", "hidden", "filter", "sort", "dir", "importDraft", "cats", "listCat"]) {
       try { localStorage.removeItem(keyFor(existing.id, base)); } catch { /* ignorera */ }
     }
     configs = configs.filter(c => c.id !== existing.id); saveConfigs();
