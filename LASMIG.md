@@ -15,6 +15,10 @@ gör en commit och pushar till GitHub. Versionen syns uppe i appens titelrad.
 Stäng och öppna appen på enheterna för att få den nya versionen.
 
 ## Funktioner
+- **☰ Konfigar** (bredvid hemknappen): varje konfig är ett språk (spanska, engelska, tyska, franska,
+  italienska, portugisiska) eller ett ämne (t.ex. Företagsekonomi: begrepp ↔ förklaring) med egna kort,
+  egen progress och egna inställningar. "＋ Skapa ny konfig" och ✏️ för att ändra eller ta bort.
+  Spanska har kvar sina gamla data och de färdiga övningslekarna.
 - **Flashcards**: vänd kortet, säg om du kunde eller inte. Ord du inte kan kommer tillbaka snart.
 - **Skrivförhör**: se svenska, skriv spanska. Accentknappar (á é í ó ú ñ ¿ ¡). Fel accent räknas som "nästan".
 - **Ordlista**: alla ord med uppläsning och stjärnor för hur bra du kan dem.

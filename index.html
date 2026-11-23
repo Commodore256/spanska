@@ -13,6 +13,7 @@
 <body>
   <header class="topbar">
     <button id="btnHome" class="icon-btn" title="Tillbaka" aria-label="Tillbaka">⌂</button>
+    <button id="btnMenu" class="icon-btn" title="Konfigar" aria-label="Konfigar">☰</button>
     <h1><span id="title">¡Hola! Spanska</span> <small id="version" class="version"></small></h1>
     <button id="btnSettings" class="icon-btn" title="Inställningar" aria-label="Inställningar">⚙</button>
     <button id="btnFull" class="icon-btn" title="Helskärm" aria-label="Helskärm">⛶</button>
@@ -20,6 +21,18 @@
 
   <main id="view"></main>
   <div id="toast" class="toast"></div>
+
+  <!-- ☰ Konfig-menyn -->
+  <div id="drawerBg" class="drawer-bg"></div>
+  <aside id="drawer" class="drawer" aria-label="Konfigar">
+    <div class="drawer-head">
+      <b>Konfigar</b>
+      <button id="btnCloseDrawer" class="icon-btn" title="Stäng" aria-label="Stäng">✕</button>
+    </div>
+    <p class="muted small drawer-help">Varje konfig är ett språk eller ett ämne med egna kort och egen progress.</p>
+    <ul id="configList" class="config-list"></ul>
+    <button id="btnNewConfig" class="btn good drawer-new">＋ Skapa ny konfig</button>
+  </aside>
 
   <!-- Startsida -->
   <template id="tpl-home">
@@ -43,21 +56,15 @@
     <section class="mycards">
       <form id="addForm" class="add-form" autocomplete="off">
         <div class="add-cols">
-          <label>Svenska<input id="inSv" type="text" lang="sv" placeholder="t.ex. att hjälpa" spellcheck="false"></label>
-          <label>Español<input id="inEs" type="text" lang="es" placeholder="t.ex. ayudar" spellcheck="false" autocapitalize="off"></label>
+          <label><span id="lblSv">Svenska</span><input id="inSv" type="text" lang="sv" placeholder="t.ex. att hjälpa" spellcheck="false"></label>
+          <label><span id="lblEs">Español</span><input id="inEs" type="text" lang="es" placeholder="t.ex. ayudar" spellcheck="false" autocapitalize="off"></label>
         </div>
-        <div class="accents" data-target="inEs">
-          <button type="button" data-ch="á">á</button><button type="button" data-ch="é">é</button>
-          <button type="button" data-ch="í">í</button><button type="button" data-ch="ó">ó</button>
-          <button type="button" data-ch="ú">ú</button><button type="button" data-ch="ñ">ñ</button>
-          <button type="button" data-ch="ü">ü</button><button type="button" data-ch="¿">¿</button>
-          <button type="button" data-ch="¡">¡</button>
-        </div>
+        <div class="accents" data-target="inEs"></div>
         <div class="add-row">
           <button class="btn good" type="submit">＋ Lägg till</button>
           <span id="aiStatus" class="ai-status"></span>
         </div>
-        <p class="muted small">Skriv i en ruta eller båda. Tom ruta fylls i av AI:n. Stavfel markeras gult så du kan rätta dem sen.</p>
+        <p id="addHelp" class="muted small">Skriv i en ruta eller båda. Tom ruta fylls i automatiskt. Stavfel markeras gult så du kan rätta dem sen.</p>
       </form>
       <button id="btnImport" class="btn import-btn">Importera flashcards från text 📋</button>
 
@@ -187,13 +194,7 @@
       </div>
       <form id="writeForm" class="write-form" autocomplete="off">
         <input id="answer" type="text" autocapitalize="off" spellcheck="false">
-        <div class="accents" data-target="answer">
-          <button type="button" data-ch="á">á</button><button type="button" data-ch="é">é</button>
-          <button type="button" data-ch="í">í</button><button type="button" data-ch="ó">ó</button>
-          <button type="button" data-ch="ú">ú</button><button type="button" data-ch="ñ">ñ</button>
-          <button type="button" data-ch="ü">ü</button><button type="button" data-ch="¿">¿</button>
-          <button type="button" data-ch="¡">¡</button>
-        </div>
+        <div class="accents" data-target="answer"></div>
         <button class="btn good" type="submit">Rätta</button>
       </form>
       <div id="feedback" class="feedback hidden"></div>
@@ -222,9 +223,39 @@
       <h2>Övningsriktning</h2>
       <select id="dirSel">
         <option value="mix">Blandat – båda hållen</option>
-        <option value="sv2es">Svenska → spanska</option>
-        <option value="es2sv">Spanska → svenska</option>
+        <option value="sv2es" id="optSv2Es">Svenska → målspråket</option>
+        <option value="es2sv" id="optEs2Sv">Målspråket → svenska</option>
       </select>
+    </section>
+  </template>
+
+  <!-- Skapa / ändra konfig -->
+  <template id="tpl-config-edit">
+    <section class="config-edit">
+      <h2 id="cfgTitle">Ny konfig</h2>
+      <label class="field">Namn<input id="cfgName" type="text" placeholder="t.ex. Engelska eller Företagsekonomi"></label>
+      <label class="field">Ikon (emoji)<input id="cfgIcon" type="text" maxlength="8" placeholder="📘"></label>
+      <div class="field">Typ
+        <div class="seg">
+          <label><input type="radio" name="cfgType" value="language" checked> 🌍 Språk</label>
+          <label><input type="radio" name="cfgType" value="subject"> 📚 Ämne</label>
+        </div>
+      </div>
+      <div id="cfgLangBox">
+        <label class="field">Språk<select id="cfgLang"></select></label>
+        <p class="muted small">Korten blir svenska ↔ valt språk, med uppläsning, accentknappar och översättning.</p>
+      </div>
+      <div id="cfgSubjectBox" class="hidden">
+        <label class="field">Framsida<input id="cfgFront" type="text" placeholder="Begrepp"></label>
+        <label class="field">Baksida<input id="cfgBack" type="text" placeholder="Förklaring"></label>
+        <p class="muted small">T.ex. Företagsekonomi: begrepp ↔ förklaring. Med AI kopplad skriver AI:n förklaringar och
+          plockar ut begrepp ur texter du klistrar in.</p>
+      </div>
+      <p id="cfgLocked" class="muted small hidden">Typ och språk kan inte ändras eftersom konfigen redan har kort.</p>
+      <div class="row">
+        <button id="btnSaveCfg" class="btn good">Spara</button>
+        <button id="btnDeleteCfg" class="btn bad hidden">🗑 Ta bort konfig</button>
+      </div>
     </section>
   </template>
 

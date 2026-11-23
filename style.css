@@ -235,3 +235,36 @@ code { background: rgba(127,127,127,.15); padding: 1px 5px; border-radius: 4px; 
   transition: opacity .2s, transform .2s; pointer-events: none; z-index: 10; max-width: 90vw; text-align: center;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- ☰ Konfig-menyn ---------- */
+.drawer-bg { position: fixed; inset: 0; background: rgba(0,0,0,.35); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 20; }
+.drawer-bg.open { opacity: 1; pointer-events: auto; }
+.drawer {
+  position: fixed; top: 0; bottom: 0; left: 0; width: min(340px, 88vw); background: var(--bg);
+  transform: translateX(-102%); transition: transform .22s ease-out; z-index: 21;
+  display: flex; flex-direction: column; box-shadow: 4px 0 20px rgba(0,0,0,.2);
+  padding-top: env(safe-area-inset-top);
+}
+.drawer.open { transform: translateX(0); }
+.drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--red); color: #fff; border-bottom: 4px solid var(--yellow); }
+.drawer-head b { font-size: 1.2rem; }
+.drawer-help { margin: 10px 14px 4px; }
+.config-list { list-style: none; margin: 0; padding: 6px 10px; overflow-y: auto; flex: 1; }
+.config-item { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; background: var(--card); border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08); border: 2px solid transparent; }
+.config-item.active { border-color: var(--red); }
+.config-pick { flex: 1; display: flex; align-items: center; gap: 10px; border: 0; background: transparent; color: var(--text); padding: 12px; cursor: pointer; text-align: left; }
+.config-icon { font-size: 1.8rem; }
+.config-text { display: flex; flex-direction: column; flex: 1; }
+.config-text small { color: var(--muted); }
+.config-check { color: var(--red); font-weight: 800; font-size: 1.2rem; }
+.config-edit-btn { border: 0; background: transparent; font-size: 1.2rem; padding: 10px; cursor: pointer; }
+.drawer-new { margin: 10px 14px calc(14px + env(safe-area-inset-bottom)); }
+
+.config-edit .field input, .config-edit .field select { font-size: 1.1rem; padding: 10px; border-radius: 10px; border: 2px solid rgba(127,127,127,.35); background: var(--card); color: var(--text); width: 100%; }
+.seg { display: flex; gap: 10px; margin-top: 4px; }
+.seg label { flex: 1; display: flex; align-items: center; gap: 8px; background: var(--card); padding: 12px; border-radius: 10px; color: var(--text); cursor: pointer; border: 2px solid rgba(127,127,127,.25); }
+.seg label:has(input:checked) { border-color: var(--red); }
+
+/* Ämnen: ingen uppläsning, längre texter */
+body.no-tts #btnSpeak, body.no-tts .actions button[title="Lyssna"], body.no-tts .sc-speak { display: none; }
+.card-text.long, .sc-sv.long { font-size: 1.15rem; font-weight: 500; line-height: 1.4; }

@@ -1,20 +1,12 @@
 "use strict";
 
 // =====================================================================
-//  Lagring
+//  Grundläggande lagring
 // =====================================================================
-const LS = {
-  progress: "spanska.progress",   // progress för de färdiga lekarna
-  cards: "spanska.cards",         // Mina kort
-  oldMyWords: "spanska.mywords",  // gammalt format (flyttas till Mina kort)
-  dir: "spanska.dir",
-  ai: "spanska.ai",
-  filter: "spanska.filter",
-  sort: "spanska.sort"
-};
 const MAX_BOX = 5;       // 0 = nytt/svårt … 5 = sitter riktigt bra
 const KNOWN_BOX = 3;     // från den här nivån räknas ordet som "kan"
 const SESSION_SIZE = 10;
+const LS_AI = "spanska.ai";   // AI-inställningarna gäller alla konfigar
 
 function load(key, fallback) {
   try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); }
@@ -24,27 +16,67 @@ function save(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* full eller blockerad */ }
 }
 
-let progress = load(LS.progress, {});
+// =====================================================================
+//  Konfigar (språk och ämnen)
+// =====================================================================
+// En konfig: { id, name, icon, type: "language" | "subject", lang?, front?, back? }
+// Fälten i korten heter sv (svenska sidan / begreppet) och es (målspråket / förklaringen).
+const LANGS = {
+  es: { name: "Spanska", native: "Español", tts: "es-ES", accents: "á é í ó ú ñ ü ¿ ¡",
+        article: /^(el|la|los|las|un|una|unos|unas)\s+/i, verb: /(ar|er|ir)(se)?$/ },
+  en: { name: "Engelska", native: "English", tts: "en-GB", accents: "",
+        article: /^(the|a|an)\s+/i, verb: null },
+  de: { name: "Tyska", native: "Deutsch", tts: "de-DE", accents: "ä ö ü ß",
+        article: /^(der|die|das|den|dem|ein|eine|einen)\s+/i, verb: /(en|ern|eln)$/ },
+  fr: { name: "Franska", native: "Français", tts: "fr-FR", accents: "é è ê à â ç ô û ù ë ï œ",
+        article: /^(le|la|les|l'|un|une|des)\s*/i, verb: /(er|ir|re)$/ },
+  it: { name: "Italienska", native: "Italiano", tts: "it-IT", accents: "à è é ì ò ù",
+        article: /^(il|lo|la|i|gli|le|l'|un|uno|una)\s*/i, verb: /(are|ere|ire)$/ },
+  pt: { name: "Portugisiska", native: "Português", tts: "pt-PT", accents: "á â ã à é ê í ó ô õ ú ç",
+        article: /^(o|a|os|as|um|uma)\s+/i, verb: /(ar|er|ir)$/ }
+};
+const DEFAULT_CONFIG = { id: "spanska", name: "Spanska", icon: "🇪🇸", type: "language", lang: "es" };
+
+let configs = load("app.configs", null);
+if (!Array.isArray(configs) || !configs.length) { configs = [DEFAULT_CONFIG]; save("app.configs", configs); }
+let activeId = load("app.active", configs[0].id);
+if (!configs.some(c => c.id === activeId)) activeId = configs[0].id;
+
+function cfg() { return configs.find(c => c.id === activeId) || configs[0]; }
+function isLanguage(c = cfg()) { return c.type !== "subject"; }
+function langInfo(c = cfg()) { return LANGS[c.lang] || LANGS.es; }
+function sideLabels(c = cfg()) {
+  return isLanguage(c) ? { sv: "Svenska", es: langInfo(c).native } : { sv: c.front || "Begrepp", es: c.back || "Förklaring" };
+}
+function hasBuiltinDecks() { return activeId === "spanska" && typeof BUILTIN_DECKS !== "undefined"; }
+// Spanska-konfigen behåller sina gamla nycklar så att ingen data försvinner
+function keyFor(id, base) { return id === "spanska" ? "spanska." + base : "cfg." + id + "." + base; }
+function lsKey(base) { return keyFor(activeId, base); }
+function saveConfigs() { save("app.configs", configs); }
+
+// =====================================================================
+//  Data för aktiv konfig
+// =====================================================================
+let progress = {}, hidden = {}, cards = [], listFilter = "all", listSort = "new";
+
 function getBox(deckId, es) { return (progress[deckId] && progress[deckId][es]) || 0; }
 function setBox(deckId, es, box) {
   progress[deckId] = progress[deckId] || {};
   progress[deckId][es] = clampBox(box);
-  save(LS.progress, progress);
+  save(lsKey("progress"), progress);
 }
 function clampBox(b) { return Math.max(0, Math.min(MAX_BOX, b)); }
 
 // Ord du tagit bort ur de färdiga lekarna (döljs, kan visas igen)
-const LS_HIDDEN = "spanska.hidden";
-let hidden = load(LS_HIDDEN, {});
 function isHidden(deckId, es) { return (hidden[deckId] || []).includes(es); }
-function hideWord(deckId, es) { hidden[deckId] = [...new Set([...(hidden[deckId] || []), es])]; save(LS_HIDDEN, hidden); }
+function hideWord(deckId, es) { hidden[deckId] = [...new Set([...(hidden[deckId] || []), es])]; save(lsKey("hidden"), hidden); }
 function visibleWords(deck) { return deck.words.filter(([es]) => !isHidden(deck.id, es)); }
 
 // =====================================================================
 //  Mina kort
 // =====================================================================
 // Ett kort: { id, sv, es, created, box, seen, right, wrong, lastSeen,
-//             filled: "sv"|"es"|null  (vilken sida AI:n fyllde i),
+//             filled: "sv"|"es"|null  (vilken sida som fylldes i automatiskt),
 //             check: { status, svFix, esFix, note } }
 // status: "pending" (väntar på kontroll), "ok", "warn" (gul – något att rätta),
 //         "unchecked" (ingen AI tillgänglig)
@@ -57,11 +89,11 @@ function newCard(sv, es) {
   };
 }
 function loadCards() {
-  let list = load(LS.cards, null);
+  let list = load(lsKey("cards"), null);
   if (Array.isArray(list)) return list;
-  // Första gången: flytta över "Mina glosor" från den gamla versionen
   list = [];
-  const old = load(LS.oldMyWords, "");
+  // Första gången i Spanska: flytta över "Mina glosor" från den allra första versionen
+  const old = activeId === "spanska" ? load("spanska.mywords", "") : "";
   if (typeof old === "string") {
     for (const line of old.split(/\r?\n/)) {
       const i = line.indexOf("=");
@@ -73,11 +105,18 @@ function loadCards() {
       list.push(c);
     }
   }
-  save(LS.cards, list);
+  save(lsKey("cards"), list);
   return list;
 }
-let cards = loadCards();
-function saveCards() { save(LS.cards, cards); }
+function loadConfigData() {
+  progress = load(lsKey("progress"), {});
+  hidden = load(lsKey("hidden"), {});
+  cards = loadCards();
+  listFilter = load(lsKey("filter"), "all");
+  listSort = load(lsKey("sort"), "new");
+}
+loadConfigData();
+function saveCards() { save(lsKey("cards"), cards); }
 function cardById(id) { return cards.find(c => c.id === id); }
 
 function isWarn(c) { return c.check?.status === "warn" || !c.sv || !c.es; }
@@ -87,7 +126,7 @@ function isUnchecked(c) { return ["pending", "unchecked"].includes(c.check?.stat
 // =====================================================================
 //  AI: översättning och stavningskontroll
 // =====================================================================
-function aiConfig() { return load(LS.ai, { url: "", key: "" }); }
+function aiConfig() { return load(LS_AI, { url: "", key: "" }); }
 function aiEnabled() { const c = aiConfig(); return !!(c.url && c.key); }
 
 async function fetchJson(url, options = {}, timeoutMs = 20000) {
@@ -100,24 +139,30 @@ async function fetchJson(url, options = {}, timeoutMs = 20000) {
   } finally { clearTimeout(t); }
 }
 
+// Vad AI:n behöver veta om konfigen
+function aiCfgPayload(c = cfg()) {
+  return isLanguage(c)
+    ? { type: "language", lang: c.lang, langName: langInfo(c).name }
+    : { type: "subject", subject: c.name, front: sideLabels(c).sv, back: sideLabels(c).es };
+}
+
 // Frågar Claude via din Cloudflare Worker. Svar: { sv, es, svFix, esFix, note }
-async function aiCheck(sv, es) {
+async function aiCheck(sv, es, c = cfg()) {
   const { url, key } = aiConfig();
   return fetchJson(url.replace(/\/+$/, ""), {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-App-Key": key },
-    body: JSON.stringify({ sv, es })
+    body: JSON.stringify({ sv, es, cfg: aiCfgPayload(c) })
   });
 }
 
-// ---------- Reserv utan AI ----------
+// ---------- Reserv utan AI (bara för språk-konfigar) ----------
 // Korta begrepp (1–3 ord) slås upp i ett lexikon (svenska Wiktionary).
 // Längre meningar och ord som inte finns i lexikonet går till MyMemory (bra på meningar).
 const SHORT_MAX_WORDS = 3;
 function wordCount(t) { return (t || "").trim().split(/\s+/).filter(Boolean).length; }
 
 const SV_PREFIX = /^(att|en|ett)\s+/i;
-const ES_ARTICLE = /^(el|la|los|las|un|una|unos|unas)\s+/i;
 
 async function wiktionaryText(page) {
   const url = "https://sv.wiktionary.org/w/api.php?action=parse&format=json&origin=*&redirects=1&prop=wikitext&page="
@@ -134,22 +179,24 @@ function cleanWiki(t) {
     .split(/[;:]/)[0]
     .replace(/\s+/g, " ").trim();
 }
-// svenska → spanska: svenska Wiktionary har översättningstabeller med {{ö|es|ord}}
-async function lexiconSvToEs(sv) {
+function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+// svenska → målspråket: svenska Wiktionary har översättningstabeller med {{ö|es|ord}}
+async function lexiconFromSv(sv, lang) {
   const base = sv.trim().toLowerCase().replace(SV_PREFIX, "");
   if (wordCount(base) > 2) return null;
   const wiki = await wiktionaryText(base);
-  const found = [...wiki.matchAll(/\{\{ö\+?\|es\|([^}|]+)/g)].map(m => m[1].trim());
-  const words = [...new Set(found)].filter(Boolean);
+  const re = new RegExp("\\{\\{ö\\+?\\|" + escapeRe(lang) + "\\|([^}|]+)", "g");
+  const words = [...new Set([...wiki.matchAll(re)].map(m => m[1].trim()))].filter(Boolean);
   if (!words.length) return null;
   return words.slice(0, 2).join(" / ");          // högst två förslag, t.ex. "ayudar / asistir"
 }
-// spanska → svenska: svenska Wiktionary har spanska uppslagsord med definitioner på svenska
-async function lexiconEsToSv(es) {
-  const base = es.trim().toLowerCase().replace(/^[¿¡]|[?!]$/g, "").replace(ES_ARTICLE, "");
+// målspråket → svenska: svenska Wiktionary har uppslagsord på andra språk med svenska definitioner
+async function lexiconToSv(word, lang) {
+  const info = LANGS[lang] || LANGS.es;
+  const base = word.trim().toLowerCase().replace(/^[¿¡]|[?!]$/g, "").replace(info.article, "");
   if (wordCount(base) > 2) return null;
   const wiki = await wiktionaryText(base);
-  const start = wiki.search(/^==\s*Spanska\s*==\s*$/m);
+  const start = wiki.search(new RegExp("^==\\s*" + info.name + "\\s*==\\s*$", "m"));
   if (start < 0) return null;
   const rest = wiki.slice(start + 5);
   const end = rest.search(/^==[^=]/m);
@@ -158,7 +205,8 @@ async function lexiconEsToSv(es) {
   if (!line) return null;
   let sv = cleanWiki(line.replace(/^#\s*/, ""));
   if (!sv) return null;
-  if (/(ar|er|ir|arse|erse|irse)$/.test(base) && !/^att /.test(sv) && wordCount(sv) <= 2) sv = "att " + sv;  // verb
+  if (info.verb && info.verb.test(base) && /===\s*Verb\s*===/.test(section) &&
+      !/^att /.test(sv) && wordCount(sv) <= 2) sv = "att " + sv;  // verb får "att"
   return sv;
 }
 async function myMemory(text, from, to) {
@@ -183,23 +231,26 @@ function looksLikeGloss(src, out) {
   const t = out.trim();
   return wordCount(t) <= wordCount(src) + 2 && !/[-–,;:]$/.test(t) && !/[,;]/.test(t);
 }
+// toTarget = true: svenska → målspråket, annars målspråket → svenska.
 // Returnerar { text, by: "lex" | "mt" } eller null
-async function freeTranslate(text, from, to) {
+async function freeTranslate(text, toTarget, c = cfg()) {
+  if (!isLanguage(c)) return null;
+  const lang = c.lang;
   if (wordCount(text) <= SHORT_MAX_WORDS) {
     try {
-      const t = from === "sv" ? await lexiconSvToEs(text) : await lexiconEsToSv(text);
+      const t = toTarget ? await lexiconFromSv(text, lang) : await lexiconToSv(text, lang);
       if (t) return { text: t, by: "lex" };
     } catch { /* inte i lexikonet – prova MyMemory */ }
   }
-  const t = await myMemory(text, from, to);
+  const t = toTarget ? await myMemory(text, "sv", lang) : await myMemory(text, lang, "sv");
   return t ? { text: t, by: "mt" } : null;
 }
 
 function sameText(a, b) { return (a || "").trim().toLowerCase() === (b || "").trim().toLowerCase(); }
 
-async function processCard(card) {
+async function processCard(card, c = cfg()) {
   if (aiEnabled()) {
-    const r = await aiCheck(card.sv, card.es);         // kastar fel vid nätverksproblem → försök igen senare
+    const r = await aiCheck(card.sv, card.es, c);       // kastar fel vid nätverksproblem → försök igen senare
     if (!card.sv && r.sv) { card.sv = r.sv.trim(); card.filled = "sv"; card.filledBy = "ai"; }
     if (!card.es && r.es) { card.es = r.es.trim(); card.filled = "es"; card.filledBy = "ai"; }
     const svFix = r.svFix && !sameText(r.svFix, card.sv) ? r.svFix.trim() : null;
@@ -208,45 +259,49 @@ async function processCard(card) {
     card.check = {
       status: svFix || esFix || missing ? "warn" : "ok",
       byAi: true, svFix, esFix,
-      note: missing ? "Kunde inte översätta – skriv in översättningen själv." : (r.note || null)
+      note: missing ? "Kunde inte fylla i den andra sidan – skriv in den själv." : (r.note || null)
     };
   } else {
     try {
       if (!card.es && card.sv) {
-        const t = await freeTranslate(card.sv, "sv", "es");
+        const t = await freeTranslate(card.sv, true, c);
         if (t) { card.es = t.text; card.filled = "es"; card.filledBy = t.by; }
       } else if (!card.sv && card.es) {
-        const t = await freeTranslate(card.es, "es", "sv");
+        const t = await freeTranslate(card.es, false, c);
         if (t) { card.sv = t.text; card.filled = "sv"; card.filledBy = t.by; }
       }
     } catch { /* offline eller tjänsten svarar inte */ }
     const missing = !card.sv || !card.es;
+    const what = isLanguage(c) ? "Översättning saknas" : `${sideLabels(c).es} saknas`;
     card.check = missing
-      ? { status: "warn", note: "Översättning saknas – skriv in den själv (eller koppla AI under ⚙)." }
+      ? { status: "warn", note: `${what} – skriv in den själv (eller koppla AI under ⚙).` }
       : { status: "unchecked" };
   }
-  saveCards();
 }
 
 let queueRunning = false;
 async function processQueue() {
   if (queueRunning || !navigator.onLine) return;
   queueRunning = true;
+  // Kön hör till konfigen som var aktiv när den startade, även om du byter under tiden
+  const id = activeId, c = cfg(), key = lsKey("cards"), list = cards;
   try {
     // Med AI kontrolleras även kort som tidigare inte kunde kontrolleras
-    // (men aldrig samma kort två gånger med AI, och aldrig kort du själv godkänt)
-    const todo = () => cards.find(c => c.check?.status === "pending" ||
-      (aiEnabled() && !c.check?.byAi && !c.check?.manual && ["unchecked", "warn"].includes(c.check?.status)));
-    let c, failures = 0;
-    while ((c = todo()) && failures < 2) {
-      c.check = { ...c.check, status: "pending" };
-      try { await processCard(c); failures = 0; }
-      catch (e) { console.warn("AI-kontroll misslyckades:", e); failures++; break; }
-      refreshCardViews();
+    // (men aldrig samma kort två gånger med AI, och aldrig kort du själv godkänt eller gulmarkerat)
+    const todo = () => list.find(x => x.check?.status === "pending" ||
+      (aiEnabled() && !x.check?.byAi && !x.check?.manual && ["unchecked", "warn"].includes(x.check?.status)));
+    let card;
+    while ((card = todo())) {
+      card.check = { ...card.check, status: "pending" };
+      try { await processCard(card, c); }
+      catch (e) { console.warn("AI-kontroll misslyckades:", e); break; }
+      finally { save(key, list); }
+      if (activeId === id) refreshCardViews();
     }
   } finally {
     queueRunning = false;
-    refreshCardViews();
+    if (activeId === id) refreshCardViews();
+    else processQueue();      // fortsätt med den konfig som är aktiv nu
   }
 }
 window.addEventListener("online", processQueue);
@@ -254,19 +309,20 @@ window.addEventListener("online", processQueue);
 // =====================================================================
 //  Uttal
 // =====================================================================
-let esVoice = null;
+let voice = null;
 function pickVoice() {
   if (!("speechSynthesis" in window)) return;
+  const tts = langInfo().tts, short = tts.slice(0, 2);
   const voices = speechSynthesis.getVoices();
-  esVoice = voices.find(v => v.lang === "es-ES") || voices.find(v => v.lang.startsWith("es")) || null;
+  voice = voices.find(v => v.lang === tts) || voices.find(v => v.lang.startsWith(short)) || null;
 }
 if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
 function speak(text) {
-  if (!("speechSynthesis" in window) || !text) return;
+  if (!("speechSynthesis" in window) || !text || !isLanguage()) return;
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text.replace(/…/g, ""));
-  u.lang = "es-ES";
-  if (esVoice) u.voice = esVoice;
+  u.lang = langInfo().tts;
+  if (voice) u.voice = voice;
   u.rate = 0.85;
   speechSynthesis.speak(u);
 }
@@ -321,6 +377,11 @@ function shuffle(arr) {
 }
 function setupAccents(root) {
   root.querySelectorAll(".accents").forEach(group => {
+    // Knapparna byggs efter konfigens språk (inga för engelska och ämnen)
+    const chars = isLanguage() ? langInfo().accents.split(" ").filter(Boolean) : [];
+    group.innerHTML = "";
+    group.classList.toggle("hidden", !chars.length);
+    for (const ch of chars) { const b = el("button", "", ch); b.type = "button"; b.dataset.ch = ch; group.append(b); }
     group.querySelectorAll("button").forEach(b => {
       b.onmousedown = e => e.preventDefault();   // behåll fokus i textrutan
       b.onclick = () => {
@@ -339,18 +400,19 @@ function setupAccents(root) {
 //  Startsida
 // =====================================================================
 function showHome() {
-  titleEl.textContent = "¡Hola! Spanska";
+  titleEl.textContent = homeTitle();
   goBack = null; reopen = showHome;
   render("tpl-home", "home");
   const total = cards.length, known = cards.filter(isKnown).length, warn = cards.filter(isWarn).length;
   $("#myCardsInfo").textContent = total
     ? `${total} kort · ${known} kan du` + (warn ? ` · ${warn} att rätta 🟡` : "")
-    : "Inga kort än – tryck här och lägg till dina egna ord";
+    : (isLanguage() ? "Inga kort än – tryck här och lägg till dina egna ord" : "Inga kort än – tryck här och lägg till begrepp");
   $("#myCardsBar").style.width = total ? `${Math.round(100 * cards.reduce((s, c) => s + c.box, 0) / (total * MAX_BOX))}%` : "0";
   $("#btnMyCards").onclick = showMyCards;
 
   const list = $("#deckList");
-  for (const deck of BUILTIN_DECKS) {
+  if (!hasBuiltinDecks()) { $(".lead").classList.add("hidden"); list.classList.add("hidden"); }
+  for (const deck of hasBuiltinDecks() ? BUILTIN_DECKS : []) {
     const words = visibleWords(deck);
     const boxes = words.map(([es]) => getBox(deck.id, es));
     const known = boxes.filter(b => b >= KNOWN_BOX).length;
@@ -364,7 +426,7 @@ function showHome() {
   $("#btnUpdate").onclick = forceUpdate;
   $("#btnReset").onclick = () => {
     if (!confirm("Vill du nollställa all progress? (Dina kort finns kvar, bara statistiken nollas.)")) return;
-    progress = {}; save(LS.progress, progress);
+    progress = {}; save(lsKey("progress"), progress);
     cards.forEach(c => { c.box = 0; c.seen = 0; c.right = 0; c.wrong = 0; c.lastSeen = 0; });
     saveCards(); showHome();
   };
@@ -373,8 +435,6 @@ function showHome() {
 // =====================================================================
 //  Mina kort
 // =====================================================================
-let listFilter = load(LS.filter, "all");
-let listSort = load(LS.sort, "new");
 let editingId = null;
 
 function filteredCards() {
@@ -405,6 +465,19 @@ function showMyCards() {
   render("tpl-mycards", "mycards");
 
   const inSv = $("#inSv"), inEs = $("#inEs"), accents = $("#addForm .accents");
+  const L = sideLabels();
+  $("#lblSv").textContent = L.sv; $("#lblEs").textContent = L.es;
+  if (isLanguage()) {
+    const ex = { es: ["att hjälpa", "ayudar"], en: ["att hjälpa", "to help"], de: ["att hjälpa", "helfen"],
+                 fr: ["att hjälpa", "aider"], it: ["att hjälpa", "aiutare"], pt: ["att hjälpa", "ajudar"] }[cfg().lang] || ["", ""];
+    inSv.placeholder = "t.ex. " + ex[0]; inEs.placeholder = "t.ex. " + ex[1];
+    inEs.lang = cfg().lang;
+  } else {
+    inSv.placeholder = "t.ex. inflation"; inEs.placeholder = "lämna tom så skriver AI:n";
+    inEs.lang = "sv";
+    $("#addHelp").textContent = "Skriv begreppet, och förklaringen om du vill. Lämnar du förklaringen tom skriver AI:n en (kräver AI under ⚙).";
+    view.querySelector('[data-practice="write"]').classList.add("hidden");
+  }
   [inSv, inEs].forEach(inp => inp.addEventListener("focus", () => { accents.dataset.lastTarget = inp.id; }));
   setupAccents(view);
 
@@ -425,14 +498,14 @@ function showMyCards() {
   view.querySelectorAll("#filters .chip").forEach(chip => {
     chip.classList.toggle("active", chip.dataset.filter === listFilter);
     chip.onclick = () => {
-      listFilter = chip.dataset.filter; save(LS.filter, listFilter);
+      listFilter = chip.dataset.filter; save(lsKey("filter"), listFilter);
       view.querySelectorAll("#filters .chip").forEach(c => c.classList.toggle("active", c === chip));
       renderCardList();
     };
   });
   const sortSel = $("#sortSel");
   sortSel.value = listSort;
-  sortSel.onchange = () => { listSort = sortSel.value; save(LS.sort, listSort); renderCardList(); };
+  sortSel.onchange = () => { listSort = sortSel.value; save(lsKey("sort"), listSort); renderCardList(); };
 
   view.querySelectorAll("[data-practice]").forEach(b => {
     b.onclick = () => {
@@ -537,8 +610,9 @@ function cardRow(c) {
 function cardEditRow(c) {
   const li = el("li", "crd editing");
   const cols = el("div", "cols");
-  const sv = el("input"); sv.value = c.sv; sv.placeholder = "Svenska"; sv.lang = "sv";
-  const es = el("input"); es.value = c.es; es.placeholder = "Español"; es.lang = "es"; es.id = "editEs";
+  const L = sideLabels();
+  const sv = el("input"); sv.value = c.sv; sv.placeholder = L.sv; sv.lang = "sv";
+  const es = el("input"); es.value = c.es; es.placeholder = L.es; es.lang = isLanguage() ? cfg().lang : "sv"; es.id = "editEs";
   cols.append(sv, es);
   const btns = el("div", "fix-row");
   const bSave = el("button", "btn-small good", "Spara");
@@ -644,7 +718,6 @@ function builtinDeck(deck) {
 // =====================================================================
 //  Importera flashcards från text
 // =====================================================================
-const LS_IMPORT_DRAFT = "spanska.importDraft";
 const MAX_IMPORT_CHARS = 8000;
 
 // Enkla, vanliga ord som inte blir kort när AI:n inte är kopplad
@@ -658,6 +731,9 @@ const ES_STOP = new Set(("el la lo los las un una unos unas y e o u ni pero sino
   "otro otra otros otras cada mismo misma qué cómo cuál cuáles quién dónde cuándo cuánto bien mal bueno buena día " +
   "días casa año años vez veces hoy ayer mañana ahora siempre nunca entonces luego después antes algo nada alguien " +
   "nadie algún alguna ningún ninguna tan tanto cosa cosas gran grande grandes").split(" "));
+const EN_STOP = new Set(("the and that this with from have has had was were are been being will would could should " +
+  "they them their there then than what when where which while about into over under after before very also just " +
+  "some more most much many such only other your yours ours mine these those here because").split(" "));
 const SV_STOP = new Set(("och att det som en ett är var jag du han hon vi ni de den dem dig mig sig sin sitt sina " +
   "på i av för med till om har hade inte men så kan kunde ska skulle vill ville från eller när där här man hans " +
   "hennes deras vår vårt våra min mitt mina din ditt dina mycket också bara nu då efter under över vid än hur vad " +
@@ -665,16 +741,17 @@ const SV_STOP = new Set(("och att det som en ett är var jag du han hon vi ni de
   "gör gjorde kommer kom sedan redan även mer mest många lite dag dagar år").split(" "));
 
 function localExtract(text) {
-  const isSv = /[åäö]/i.test(text) && !/[ñ¿¡áéíóú]/i.test(text);
-  const stop = isSv ? SV_STOP : ES_STOP;
+  // Ämnen och svenska texter: plocka svenska ord. Annars ord på målspråket.
+  const isSv = !isLanguage() || (/[åäö]/i.test(text) && !/[ñ¿¡áéíóúßçèêàœ]/i.test(text));
+  const stop = isSv ? SV_STOP : (cfg().lang === "es" ? ES_STOP : (cfg().lang === "en" ? EN_STOP : new Set()));
   const counts = new Map();
-  for (const m of text.matchAll(/[A-Za-zÁÉÍÓÚÜÑáéíóúüñÅÄÖåäö]+/g)) {
+  for (const m of text.matchAll(/\p{L}+/gu)) {
     const w = m[0], lw = w.toLowerCase();
     if (lw.length < 4 || stop.has(lw)) continue;
     // Hoppa över troliga namn: stor bokstav mitt i en mening
     const pre = text.slice(0, m.index).replace(/[ \t]+$/, "");
     const sentenceStart = !pre.trim() || /[.!?¿¡:"«\n]$/.test(pre);
-    if (/^[A-ZÁÉÍÓÚÑÅÄÖ]/.test(w) && !sentenceStart) continue;
+    if (/^\p{Lu}/u.test(w) && !sentenceStart) continue;
     counts.set(lw, (counts.get(lw) || 0) + 1);
   }
   return [...counts.entries()]
@@ -685,11 +762,11 @@ function localExtract(text) {
 
 async function aiExtract(text) {
   const { url, key } = aiConfig();
-  const known = cards.map(c => c.es).filter(Boolean).slice(0, 400);
+  const known = cards.map(c => isLanguage() ? c.es : c.sv).filter(Boolean).slice(0, 400);
   const r = await fetchJson(url.replace(/\/+$/, ""), {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-App-Key": key },
-    body: JSON.stringify({ mode: "extract", text, known })
+    body: JSON.stringify({ mode: "extract", text, known, cfg: aiCfgPayload() })
   }, 90000);
   return Array.isArray(r.terms) ? r.terms : [];
 }
@@ -702,7 +779,7 @@ async function translateTerms(terms, onProgress) {
     while (next < todo.length) {
       const t = todo[next++];
       try {
-        const r = t.es ? await freeTranslate(t.es, "es", "sv") : await freeTranslate(t.sv, "sv", "es");
+        const r = t.es ? await freeTranslate(t.es, false) : await freeTranslate(t.sv, true);
         if (r) {
           if (t.es) { t.sv = r.text; t.filled = "sv"; } else { t.es = r.text; t.filled = "es"; }
           t.by = r.by;
@@ -719,14 +796,14 @@ function showImport() {
   goBack = showMyCards; reopen = showImport;
   render("tpl-import", "import");
   const ta = $("#importText"), count = $("#importCount"), status = $("#importStatus"), submit = $("#btnSubmitText");
-  ta.value = load(LS_IMPORT_DRAFT, "");
+  ta.value = load(lsKey("importDraft"), "");
   const updateCount = () => {
     const n = ta.value.length;
     count.textContent = n ? `${n} tecken` + (n > MAX_IMPORT_CHARS ? ` – bara de första ${MAX_IMPORT_CHARS} analyseras` : "") : "";
   };
   updateCount();
-  ta.oninput = () => { save(LS_IMPORT_DRAFT, ta.value); updateCount(); };
-  $("#btnClearText").onclick = () => { ta.value = ""; save(LS_IMPORT_DRAFT, ""); updateCount(); status.textContent = ""; ta.focus(); };
+  ta.oninput = () => { save(lsKey("importDraft"), ta.value); updateCount(); };
+  $("#btnClearText").onclick = () => { ta.value = ""; save(lsKey("importDraft"), ""); updateCount(); status.textContent = ""; ta.focus(); };
   submit.onclick = async () => {
     const text = ta.value.trim().slice(0, MAX_IMPORT_CHARS);
     if (!text) { status.textContent = "Klistra in en text först."; ta.focus(); return; }
@@ -756,7 +833,7 @@ function showImport() {
       return !cards.some(c => (t.es && sameText(c.es, t.es)) || (t.sv && sameText(c.sv, t.sv)));
     });
     if (!terms.length) { status.textContent = notice + "Hittade inga nya begrepp i texten."; return; }
-    if (!usedAi && terms.some(t => !t.sv || !t.es)) {
+    if (!usedAi && isLanguage() && terms.some(t => !t.sv || !t.es)) {
       submit.disabled = true;
       status.textContent = `Översätter ${terms.length} ord…`;
       await translateTerms(terms, (d, n) => { status.textContent = `Översätter orden… ${d} / ${n}`; });
@@ -776,18 +853,21 @@ function runSwipe(terms, usedAi, notice) {
   let index = 0, added = 0, busy = false;
 
   function makeCard(t) {
+    const L = sideLabels(), lang = isLanguage();
+    // Språk: målspråket stort överst. Ämnen: begreppet stort, förklaringen under.
+    const top = lang ? "es" : "sv", bottom = lang ? "sv" : "es";
+    const missing = lang ? "ingen översättning hittades" : "ingen förklaring än – AI:n kan skriva en";
     const c = el("div", "swipe-card");
     c.append(el("div", "stamp yes", "LÄGG TILL"), el("div", "stamp no", "HOPPA ÖVER"));
-    c.append(el("small", "lang-tag", "Español"), el("div", "sc-es", t.es || "—"));
+    const topEl = el("div", "sc-es", t[top] || missing), botEl = el("div", "sc-sv", t[bottom] || missing);
+    c.append(el("small", "lang-tag", L[top]), topEl, el("small", "lang-tag2", L[bottom]), botEl);
+    if (!t[top]) topEl.classList.add("muted");
+    if (!t[bottom]) botEl.classList.add("muted");
+    if ((t[bottom] || "").length > 40) botEl.classList.add("long");
     const tag = { lex: " 📖", mt: " 🌐" }[t.by] || "";
-    c.append(el("small", "lang-tag2", "Svenska"));
-    const es = c.querySelector(".sc-es"), sv = el("div", "sc-sv", t.sv || "ingen översättning hittades – du kan skriva in den sen");
-    c.append(sv);
-    if (!t.sv) sv.classList.add("muted");
-    if (!t.es) { es.textContent = "ingen översättning hittades"; es.classList.add("muted"); }
-    if (tag) (t.filled === "es" ? es : sv).append(el("small", "ai-tag", tag));
+    if (tag && t.filled) (t.filled === top ? topEl : botEl).append(el("small", "ai-tag", tag));
     if (t.note) c.append(el("div", "sc-note", t.note));
-    if (t.es) {
+    if (t.es && lang) {
       const b = el("button", "sc-speak", "🔊");
       b.onpointerdown = e => e.stopPropagation();
       b.onclick = e => { e.stopPropagation(); speak(t.es); };
@@ -877,7 +957,7 @@ function runSwipe(terms, usedAi, notice) {
       ? `Du valde ${added} av ${terms.length} begrepp. De finns nu i Mina kort.`
       : "Du hoppade över alla begrepp.";
     $("#btnToMyCards").onclick = showMyCards;
-    $("#btnImportMore").onclick = () => { save(LS_IMPORT_DRAFT, ""); showImport(); };
+    $("#btnImportMore").onclick = () => { save(lsKey("importDraft"), ""); showImport(); };
     processQueue();
   }
 
@@ -910,7 +990,7 @@ function showDeck(deckId) {
     const bu = $("#btnUnhide");
     bu.textContent = `Visa ${nHidden} borttagna ord igen`;
     bu.classList.remove("hidden");
-    bu.onclick = () => { delete hidden[deck.id]; save(LS_HIDDEN, hidden); showDeck(deck.id); };
+    bu.onclick = () => { delete hidden[deck.id]; save(lsKey("hidden"), hidden); showDeck(deck.id); };
   }
   const d = builtinDeck(deck);
   view.querySelectorAll(".mode").forEach(b => {
@@ -949,13 +1029,13 @@ function showList(deck) {
 // =====================================================================
 // Väljer de ord som behöver övas mest och slumpar riktning per kort
 function buildSession(deck) {
-  const dir = load(LS.dir, "mix");
+  const dir = load(lsKey("dir"), "mix");
   return shuffle(deck.items)
     .sort((a, b) => a.box() - b.box())
     .slice(0, SESSION_SIZE)
     .map(item => ({ item, showSv: dir === "sv2es" ? true : dir === "es2sv" ? false : Math.random() < 0.5 }));
 }
-const LANG_NAME = { sv: "Svenska", es: "Español" };
+
 
 function showDone(deck, text, again) {
   render("tpl-done", "done");
@@ -1000,7 +1080,10 @@ function runCards(deck) {
     cur = queue.shift(); flipped = false;
     refreshTools();
     const { item, showSv } = cur;
-    tag.textContent = showSv ? LANG_NAME.sv : LANG_NAME.es;
+    const L = sideLabels();
+    tag.textContent = showSv ? L.sv : L.es;
+    back.classList.toggle("long", (showSv ? item.es : item.sv).length > 40);
+    front.classList.toggle("long", (showSv ? item.sv : item.es).length > 40);
     front.textContent = showSv ? item.sv : item.es;
     back.textContent = showSv ? item.es : item.sv;
     back.classList.add("hidden");
@@ -1041,10 +1124,11 @@ function runWrite(deck) {
     cur = queue.shift(); answered = false;
     refreshTools();
     const { item, showSv } = cur;
-    $("#promptLang").textContent = (showSv ? LANG_NAME.sv : LANG_NAME.es) + " → " + (showSv ? LANG_NAME.es : LANG_NAME.sv);
+    const L = sideLabels();
+    $("#promptLang").textContent = (showSv ? L.sv : L.es) + " → " + (showSv ? L.es : L.sv);
     $("#prompt").textContent = showSv ? item.sv : item.es;
-    input.placeholder = showSv ? "Skriv på spanska…" : "Skriv på svenska…";
-    input.lang = showSv ? "es" : "sv";
+    input.placeholder = showSv ? `Skriv på ${langInfo().name.toLowerCase()}…` : "Skriv på svenska…";
+    input.lang = showSv ? cfg().lang : "sv";
     $("#progress").textContent = `${total - queue.length} / ${total}`;
     input.value = ""; input.disabled = false;
     feedback.className = "feedback hidden";
@@ -1087,10 +1171,13 @@ function showSettings() {
   titleEl.textContent = "Inställningar";
   render("tpl-settings", "settings");
   goBack = back;
-  const cfg = aiConfig();
-  $("#aiUrl").value = cfg.url || "";
-  $("#aiKey").value = cfg.key || "";
-  const saveCfg = () => save(LS.ai, { url: $("#aiUrl").value.trim(), key: $("#aiKey").value.trim() });
+  const ai = aiConfig();
+  $("#aiUrl").value = ai.url || "";
+  $("#aiKey").value = ai.key || "";
+  const L = sideLabels();
+  $("#optSv2Es").textContent = `${L.sv} → ${L.es.toLowerCase()}`;
+  $("#optEs2Sv").textContent = `${L.es} → ${L.sv.toLowerCase()}`;
+  const saveCfg = () => save(LS_AI, { url: $("#aiUrl").value.trim(), key: $("#aiKey").value.trim() });
   $("#btnSaveAi").onclick = () => { saveCfg(); $("#aiTestResult").textContent = "Sparat."; processQueue(); };
   $("#btnTestAi").onclick = async () => {
     saveCfg();
@@ -1104,9 +1191,132 @@ function showSettings() {
     } catch (e) { out.textContent = "✗ Fungerade inte: " + e.message; }
   };
   const dirSel = $("#dirSel");
-  dirSel.value = load(LS.dir, "mix");
-  dirSel.onchange = () => save(LS.dir, dirSel.value);
+  dirSel.value = load(lsKey("dir"), "mix");
+  dirSel.onchange = () => save(lsKey("dir"), dirSel.value);
 }
+
+// =====================================================================
+//  ☰ Konfig-menyn
+// =====================================================================
+const drawer = document.getElementById("drawer"), drawerBg = document.getElementById("drawerBg");
+function openDrawer() {
+  renderConfigList();
+  drawer.classList.add("open"); drawerBg.classList.add("open");
+}
+function closeDrawer() { drawer.classList.remove("open"); drawerBg.classList.remove("open"); }
+
+function configSummary(c) {
+  const n = (load(keyFor(c.id, "cards"), []) || []).length;
+  const kind = isLanguage(c) ? `Svenska ↔ ${langInfo(c).name.toLowerCase()}` : `Ämne: ${sideLabels(c).sv} ↔ ${sideLabels(c).es.toLowerCase()}`;
+  return `${kind} · ${n} kort`;
+}
+function renderConfigList() {
+  const ul = document.getElementById("configList");
+  ul.innerHTML = "";
+  for (const c of configs) {
+    const li = el("li", "config-item" + (c.id === activeId ? " active" : ""));
+    const pick = el("button", "config-pick");
+    pick.append(el("span", "config-icon", c.icon || "📘"));
+    const txt = el("span", "config-text");
+    txt.append(el("b", "", c.name), el("small", "", configSummary(c)));
+    pick.append(txt);
+    if (c.id === activeId) pick.append(el("span", "config-check", "✓"));
+    pick.onclick = () => switchConfig(c.id);
+    const edit = el("button", "config-edit-btn", "✏️"); edit.title = "Ändra konfig";
+    edit.onclick = () => { closeDrawer(); showConfigEdit(c.id); };
+    li.append(pick, edit);
+    ul.append(li);
+  }
+}
+function switchConfig(id) {
+  closeDrawer();
+  if (id === activeId) { showHome(); return; }
+  activeId = id; save("app.active", id);
+  loadConfigData();
+  applyConfigUI();
+  showHome();
+  processQueue();
+}
+
+function showConfigEdit(id) {
+  const existing = configs.find(c => c.id === id);
+  titleEl.textContent = existing ? "Ändra konfig" : "Ny konfig";
+  goBack = reopen || showHome;
+  render("tpl-config-edit", "config-edit");
+  const name = $("#cfgName"), icon = $("#cfgIcon"), lang = $("#cfgLang"), front = $("#cfgFront"), back = $("#cfgBack");
+  for (const [code, info] of Object.entries(LANGS)) {
+    const o = el("option", "", `${info.name} (${info.native})`); o.value = code; lang.append(o);
+  }
+  const setType = type => {
+    view.querySelectorAll('input[name="cfgType"]').forEach(r => { r.checked = r.value === type; });
+    $("#cfgLangBox").classList.toggle("hidden", type !== "language");
+    $("#cfgSubjectBox").classList.toggle("hidden", type !== "subject");
+  };
+  view.querySelectorAll('input[name="cfgType"]').forEach(r => r.onchange = () => setType(r.value));
+
+  if (existing) {
+    $("#cfgTitle").textContent = `Ändra ${existing.name}`;
+    name.value = existing.name; icon.value = existing.icon || "";
+    lang.value = existing.lang || "es";
+    front.value = existing.front || ""; back.value = existing.back || "";
+    setType(existing.type || "language");
+    // Typen och språket kan inte ändras när det redan finns kort (de skulle bli fel)
+    if ((load(keyFor(existing.id, "cards"), []) || []).length) {
+      view.querySelectorAll('input[name="cfgType"]').forEach(r => r.disabled = true);
+      lang.disabled = true;
+      $("#cfgLocked").classList.remove("hidden");
+    }
+    if (configs.length > 1) $("#btnDeleteCfg").classList.remove("hidden");
+  } else setType("language");
+
+  // Föreslå namn och ikon när man väljer språk
+  const FLAGS = { es: "🇪🇸", en: "🇬🇧", de: "🇩🇪", fr: "🇫🇷", it: "🇮🇹", pt: "🇵🇹" };
+  lang.onchange = () => {
+    if (!name.value || Object.values(LANGS).some(l => l.name === name.value)) name.value = LANGS[lang.value].name;
+    if (!icon.value || Object.values(FLAGS).includes(icon.value)) icon.value = FLAGS[lang.value];
+  };
+  if (!existing) lang.onchange();
+
+  $("#btnSaveCfg").onclick = () => {
+    const type = view.querySelector('input[name="cfgType"]:checked').value;
+    const n = name.value.trim();
+    if (!n) { name.focus(); toast("Ge konfigen ett namn"); return; }
+    const data = {
+      name: n, icon: icon.value.trim() || (type === "language" ? FLAGS[lang.value] : "📚"), type,
+      lang: type === "language" ? lang.value : undefined,
+      front: type === "subject" ? (front.value.trim() || "Begrepp") : undefined,
+      back: type === "subject" ? (back.value.trim() || "Förklaring") : undefined
+    };
+    if (existing) {
+      Object.assign(existing, data);
+      saveConfigs(); applyConfigUI();
+      toast("Sparat");
+      showHome();
+    } else {
+      const slug = n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 20) || "konfig";
+      const c = { id: slug + "-" + Math.random().toString(36).slice(2, 6), ...data };
+      configs.push(c); saveConfigs();
+      toast(`${c.icon} ${c.name} skapad`);
+      switchConfig(c.id);
+    }
+  };
+  $("#btnDeleteCfg").onclick = () => {
+    if (!existing || configs.length < 2) return;
+    const n = (load(keyFor(existing.id, "cards"), []) || []).length;
+    if (!confirm(`Ta bort konfigen "${existing.name}" och alla dess ${n} kort? Det går inte att ångra.`)) return;
+    for (const base of ["cards", "progress", "hidden", "filter", "sort", "dir", "importDraft"]) {
+      try { localStorage.removeItem(keyFor(existing.id, base)); } catch { /* ignorera */ }
+    }
+    configs = configs.filter(c => c.id !== existing.id); saveConfigs();
+    toast(`${existing.name} borttagen`);
+    if (activeId === existing.id) switchConfig(configs[0].id); else showHome();
+  };
+}
+
+document.getElementById("btnMenu").onclick = openDrawer;
+document.getElementById("btnCloseDrawer").onclick = closeDrawer;
+drawerBg.onclick = closeDrawer;
+document.getElementById("btnNewConfig").onclick = () => { closeDrawer(); showConfigEdit(null); };
 
 // =====================================================================
 //  Topplisten
@@ -1147,7 +1357,13 @@ async function forceUpdate() {
 }
 
 document.getElementById("version").textContent = "v" + APP_VERSION;
-document.title = "Spanska v" + APP_VERSION;
+function homeTitle() { const c = cfg(); return `${c.icon || "📘"} ${c.name}`; }
+function applyConfigUI() {
+  document.title = `${cfg().name} v${APP_VERSION}`;
+  document.body.classList.toggle("no-tts", !isLanguage());
+  pickVoice();
+}
+applyConfigUI();
 
 showHome();
 processQueue();
