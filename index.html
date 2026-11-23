@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#c0392b">
+  <title>Spanska</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <button id="btnHome" class="icon-btn" title="Hem" aria-label="Hem">⌂</button>
+    <h1 id="title">¡Hola! Spanska</h1>
+    <button id="btnFull" class="icon-btn" title="Helskärm" aria-label="Helskärm">⛶</button>
+  </header>
+
+  <main id="view"></main>
+
+  <template id="tpl-home">
+    <section class="home">
+      <p class="lead">Välj glosor att öva på</p>
+      <div id="deckList" class="deck-list"></div>
+      <div class="home-actions">
+        <button id="btnMyWords" class="btn secondary">✏️ Mina glosor</button>
+        <button id="btnReset" class="btn ghost">Nollställ progress</button>
+      </div>
+    </section>
+  </template>
+
+  <template id="tpl-deck">
+    <section class="deck">
+      <h2 id="deckName"></h2>
+      <p id="deckStats" class="muted"></p>
+      <div class="mode-grid">
+        <button class="mode" data-mode="cards"><span>🃏</span>Flashcards<small>Vänd kortet</small></button>
+        <button class="mode" data-mode="write"><span>⌨️</span>Skrivförhör<small>Skriv på spanska</small></button>
+        <button class="mode" data-mode="list"><span>📋</span>Ordlista<small>Se och lyssna</small></button>
+      </div>
+      <label class="toggle"><input type="checkbox" id="dirToggle"> Visa svenska först (på flashcards)</label>
+    </section>
+  </template>
+
+  <template id="tpl-cards">
+    <section class="cards">
+      <p id="progress" class="muted"></p>
+      <div id="card" class="card" tabindex="0">
+        <div id="cardFront" class="card-text"></div>
+        <div id="cardBack" class="card-text back hidden"></div>
+        <small class="hint">Tryck för att vända</small>
+      </div>
+      <div class="row">
+        <button id="btnSpeak" class="btn secondary">🔊 Lyssna</button>
+      </div>
+      <div id="answerRow" class="row hidden">
+        <button id="btnWrong" class="btn bad">✗ Kunde inte</button>
+        <button id="btnRight" class="btn good">✓ Kunde</button>
+      </div>
+    </section>
+  </template>
+
+  <template id="tpl-write">
+    <section class="write">
+      <p id="progress" class="muted"></p>
+      <div class="card static">
+        <div id="prompt" class="card-text"></div>
+      </div>
+      <form id="writeForm" class="write-form" autocomplete="off">
+        <input id="answer" type="text" placeholder="Skriv på spanska…" autocapitalize="off" spellcheck="false" lang="es">
+        <div class="accents">
+          <button type="button" data-ch="á">á</button><button type="button" data-ch="é">é</button>
+          <button type="button" data-ch="í">í</button><button type="button" data-ch="ó">ó</button>
+          <button type="button" data-ch="ú">ú</button><button type="button" data-ch="ñ">ñ</button>
+          <button type="button" data-ch="ü">ü</button><button type="button" data-ch="¿">¿</button>
+          <button type="button" data-ch="¡">¡</button>
+        </div>
+        <button class="btn good" type="submit">Rätta</button>
+      </form>
+      <div id="feedback" class="feedback hidden"></div>
+      <div class="row"><button id="btnNext" class="btn secondary hidden">Nästa →</button></div>
+    </section>
+  </template>
+
+  <template id="tpl-list">
+    <section class="list">
+      <ul id="wordList" class="word-list"></ul>
+    </section>
+  </template>
+
+  <template id="tpl-mywords">
+    <section class="mywords">
+      <h2>Mina glosor</h2>
+      <p class="muted">En glosa per rad: <code>spanska = svenska</code>. Till exempel <code>el perro = hunden</code></p>
+      <textarea id="myText" rows="12" spellcheck="false"></textarea>
+      <div class="row">
+        <button id="btnSaveMy" class="btn good">Spara</button>
+      </div>
+      <p id="mySaved" class="muted"></p>
+    </section>
+  </template>
+
+  <template id="tpl-done">
+    <section class="done">
+      <div class="big">🎉</div>
+      <h2>¡Muy bien!</h2>
+      <p id="doneText"></p>
+      <div class="row">
+        <button id="btnAgain" class="btn good">Öva igen</button>
+        <button id="btnBack" class="btn secondary">Tillbaka</button>
+      </div>
+    </section>
+  </template>
+
+  <script src="words.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
