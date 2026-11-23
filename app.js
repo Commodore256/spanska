@@ -310,4 +310,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
   navigator.serviceWorker.register("sw.js").catch(err => console.warn("Service worker:", err));
 }
 
+document.getElementById("version").textContent = "v" + APP_VERSION;
+document.title = "Spanska v" + APP_VERSION;
+
 showHome();
