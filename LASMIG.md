@@ -22,6 +22,8 @@ Stäng och öppna appen på enheterna för att få den nya versionen.
   Stavfel markeras gult med "Menar du …?" och en Använd-knapp. Filter (🟡 att rätta, 🟢 kan, ⚪ aldrig övade,
   🔴 svåra, ⏳ ej kontrollerade), sortering och statistik per kort (övad / ✓ kunde / ✗ kunde inte).
   Övningarna använder korten som syns i listan, och frågar åt båda hållen.
+- **Importera flashcards från text 📋** (i Mina kort): klistra in en text → AI:n plockar ut viktiga begrepp →
+  svep höger (♥ / →) för att lägga till, vänster (✗ / ←) för att hoppa över, ↶ ångrar. Utan AI görs ett enklare urval.
 - **AI**: se `..\ai-worker\AI-INSTALLATION.md`. Kopplas in under ⚙ på varje enhet.
 - **Uttal**: 🔊 läser upp på spanska med webbläsarens röst.
 - **Helskärm**: knappen ⛶ uppe till höger.

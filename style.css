@@ -177,3 +177,42 @@ code { background: rgba(127,127,127,.15); padding: 1px 5px; border-radius: 4px; 
 
 .settings h2 { margin-top: 18px; }
 .field { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; color: var(--muted); }
+
+/* ---------- Importera från text ---------- */
+.import-btn {
+  width: 100%; margin-top: 12px; background: var(--card); color: var(--text);
+  border: 2px dashed rgba(127,127,127,.45);
+}
+.import textarea { min-height: 220px; }
+
+/* ---------- Svep-korten ---------- */
+.swipe-stack { position: relative; height: 340px; margin: 10px auto 18px; max-width: 420px; }
+.swipe-card {
+  position: absolute; inset: 0; background: var(--card); border-radius: 20px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.15); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; padding: 26px; text-align: center;
+  touch-action: none; user-select: none; cursor: grab; will-change: transform;
+}
+.swipe-card:active { cursor: grabbing; }
+.swipe-card.behind { transform: scale(.94) translateY(14px); opacity: .7; pointer-events: none; }
+.swipe-card .lang-tag2 { color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-top: 18px; }
+.sc-es { font-size: clamp(1.7rem, 7vw, 2.4rem); font-weight: 700; }
+.sc-sv { font-size: 1.4rem; color: var(--red); margin-top: 4px; }
+.sc-sv.muted { color: var(--muted); font-size: 1rem; font-style: italic; }
+.sc-note { margin-top: 14px; font-size: .95rem; color: var(--muted); }
+.sc-speak { position: absolute; top: 10px; right: 12px; border: 0; background: transparent; font-size: 1.4rem; cursor: pointer; }
+.stamp {
+  position: absolute; top: 26px; padding: 6px 12px; border: 4px solid; border-radius: 10px;
+  font-weight: 800; font-size: 1.2rem; opacity: 0; pointer-events: none;
+}
+.stamp.yes { left: 18px; color: var(--good); transform: rotate(-14deg); }
+.stamp.no { right: 18px; color: var(--bad); transform: rotate(14deg); }
+.swipe-buttons { display: flex; justify-content: center; align-items: center; gap: 22px; }
+.round {
+  width: 68px; height: 68px; border-radius: 50%; border: 0; font-size: 1.8rem; cursor: pointer;
+  background: var(--card); box-shadow: 0 4px 12px rgba(0,0,0,.15);
+}
+.round.no { color: var(--bad); }
+.round.yes { color: var(--good); }
+.round.undo { width: 50px; height: 50px; font-size: 1.3rem; color: var(--muted); }
+.round:disabled { opacity: .35; cursor: default; }

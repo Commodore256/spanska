@@ -58,6 +58,7 @@
         </div>
         <p class="muted small">Skriv i en ruta eller båda. Tom ruta fylls i av AI:n. Stavfel markeras gult så du kan rätta dem sen.</p>
       </form>
+      <button id="btnImport" class="btn import-btn">Importera flashcards från text 📋</button>
 
       <div class="filters" id="filters">
         <button data-filter="all" class="chip active">Alla</button>
@@ -87,6 +88,48 @@
       <p class="muted small center">Övningen använder korten som visas i listan just nu.</p>
 
       <ul id="cardList" class="card-list"></ul>
+    </section>
+  </template>
+
+  <!-- Importera från text -->
+  <template id="tpl-import">
+    <section class="import">
+      <h2>Importera flashcards från text 📋</h2>
+      <p class="muted">Klistra in en text, till exempel från läroboken eller en uppgift. AI:n plockar ut de viktiga
+        begreppen, och sen sveper du höger på de kort du vill ha.</p>
+      <textarea id="importText" rows="12" placeholder="Klistra in texten här…" spellcheck="false"></textarea>
+      <p id="importCount" class="muted small"></p>
+      <div class="row">
+        <button id="btnClearText" class="btn ghost">🧹 Rensa</button>
+        <button id="btnSubmitText" class="btn good">Skicka ✓</button>
+      </div>
+      <p id="importStatus" class="muted center"></p>
+    </section>
+  </template>
+
+  <!-- Svep-korten -->
+  <template id="tpl-swipe">
+    <section class="swipe">
+      <p id="swipeInfo" class="muted center"></p>
+      <div id="swipeStack" class="swipe-stack"></div>
+      <div class="swipe-buttons">
+        <button id="btnSwipeNo" class="round no" title="Hoppa över (←)">✗</button>
+        <button id="btnSwipeUndo" class="round undo" title="Ångra">↶</button>
+        <button id="btnSwipeYes" class="round yes" title="Lägg till (→)">♥</button>
+      </div>
+      <p class="muted small center">Svep höger för att lägga till, vänster för att hoppa över.</p>
+    </section>
+  </template>
+
+  <template id="tpl-swipe-done">
+    <section class="done">
+      <div class="big">📒</div>
+      <h2 id="swipeDoneTitle"></h2>
+      <p id="swipeDoneText" class="muted"></p>
+      <div class="row">
+        <button id="btnToMyCards" class="btn good">Till Mina kort</button>
+        <button id="btnImportMore" class="btn secondary">Importera mer</button>
+      </div>
     </section>
   </template>
 

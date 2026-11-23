@@ -294,6 +294,7 @@ let currentView = "home";
 
 function render(tplId, name) {
   window.speechSynthesis?.cancel();
+  document.onkeydown = null;
   view.innerHTML = "";
   view.appendChild(document.getElementById(tplId).content.cloneNode(true));
   view.scrollTop = 0;
@@ -398,6 +399,8 @@ function showMyCards() {
   const inSv = $("#inSv"), inEs = $("#inEs"), accents = $("#addForm .accents");
   [inSv, inEs].forEach(inp => inp.addEventListener("focus", () => { accents.dataset.lastTarget = inp.id; }));
   setupAccents(view);
+
+  $("#btnImport").onclick = showImport;
 
   $("#addForm").onsubmit = e => {
     e.preventDefault();
@@ -589,6 +592,224 @@ function builtinDeck(deck) {
       record: ok => setBox(deck.id, es, ok ? getBox(deck.id, es) + 1 : 0)
     }))
   };
+}
+
+// =====================================================================
+//  Importera flashcards från text
+// =====================================================================
+const LS_IMPORT_DRAFT = "spanska.importDraft";
+const MAX_IMPORT_CHARS = 8000;
+
+// Enkla, vanliga ord som inte blir kort när AI:n inte är kopplad
+const ES_STOP = new Set(("el la lo los las un una unos unas y e o u ni pero sino que de del a al en con por para sin " +
+  "sobre entre hasta desde hacia según durante contra ante tras es son era eran fue fueron ser soy eres somos sido " +
+  "estar está están estoy estás estamos estaba tener tiene tengo tienes tienen tenía ir va voy vas van iba hacer hace " +
+  "hago hacen hizo hay haber ha he has han había poder puede puedo pueden podía querer quiere quiero decir dice dijo " +
+  "muy más menos mucho mucha muchos muchas poco poca pocos pocas también tampoco ya no sí se me te le nos os les " +
+  "su sus mi mis tu tus nuestro nuestra este esta estos estas ese esa esos esas eso esto aquel aquella aquí allí ahí " +
+  "cuando como donde porque pues si yo tú él ella ellos ellas usted ustedes nosotros vosotros todo toda todos todas " +
+  "otro otra otros otras cada mismo misma qué cómo cuál cuáles quién dónde cuándo cuánto bien mal bueno buena día " +
+  "días casa año años vez veces hoy ayer mañana ahora siempre nunca entonces luego después antes algo nada alguien " +
+  "nadie algún alguna ningún ninguna tan tanto cosa cosas gran grande grandes").split(" "));
+const SV_STOP = new Set(("och att det som en ett är var jag du han hon vi ni de den dem dig mig sig sin sitt sina " +
+  "på i av för med till om har hade inte men så kan kunde ska skulle vill ville från eller när där här man hans " +
+  "hennes deras vår vårt våra min mitt mina din ditt dina mycket också bara nu då efter under över vid än hur vad " +
+  "vem vilken vilket vilka alla allt några någon något detta denna dessa blir blev vara varit finns fick får göra " +
+  "gör gjorde kommer kom sedan redan även mer mest många lite dag dagar år").split(" "));
+
+function localExtract(text) {
+  const isSv = /[åäö]/i.test(text) && !/[ñ¿¡áéíóú]/i.test(text);
+  const stop = isSv ? SV_STOP : ES_STOP;
+  const counts = new Map();
+  for (const m of text.matchAll(/[A-Za-zÁÉÍÓÚÜÑáéíóúüñÅÄÖåäö]+/g)) {
+    const w = m[0], lw = w.toLowerCase();
+    if (lw.length < 4 || stop.has(lw)) continue;
+    // Hoppa över troliga namn: stor bokstav mitt i en mening
+    const pre = text.slice(0, m.index).replace(/[ \t]+$/, "");
+    const sentenceStart = !pre.trim() || /[.!?¿¡:"«\n]$/.test(pre);
+    if (/^[A-ZÁÉÍÓÚÑÅÄÖ]/.test(w) && !sentenceStart) continue;
+    counts.set(lw, (counts.get(lw) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)
+    .slice(0, 30)
+    .map(([w]) => isSv ? { sv: w, es: "", note: null } : { es: w, sv: "", note: null });
+}
+
+async function aiExtract(text) {
+  const { url, key } = aiConfig();
+  const known = cards.map(c => c.es).filter(Boolean).slice(0, 400);
+  const r = await fetchJson(url.replace(/\/+$/, ""), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-App-Key": key },
+    body: JSON.stringify({ mode: "extract", text, known })
+  }, 90000);
+  return Array.isArray(r.terms) ? r.terms : [];
+}
+
+function showImport() {
+  titleEl.textContent = "Importera";
+  goBack = showMyCards; reopen = showImport;
+  render("tpl-import", "import");
+  const ta = $("#importText"), count = $("#importCount"), status = $("#importStatus"), submit = $("#btnSubmitText");
+  ta.value = load(LS_IMPORT_DRAFT, "");
+  const updateCount = () => {
+    const n = ta.value.length;
+    count.textContent = n ? `${n} tecken` + (n > MAX_IMPORT_CHARS ? ` – bara de första ${MAX_IMPORT_CHARS} analyseras` : "") : "";
+  };
+  updateCount();
+  ta.oninput = () => { save(LS_IMPORT_DRAFT, ta.value); updateCount(); };
+  $("#btnClearText").onclick = () => { ta.value = ""; save(LS_IMPORT_DRAFT, ""); updateCount(); status.textContent = ""; ta.focus(); };
+  submit.onclick = async () => {
+    const text = ta.value.trim().slice(0, MAX_IMPORT_CHARS);
+    if (!text) { status.textContent = "Klistra in en text först."; ta.focus(); return; }
+    submit.disabled = true;
+    let terms = [], usedAi = false, notice = "";
+    try {
+      if (aiEnabled() && navigator.onLine) {
+        status.textContent = "🤖 AI:n analyserar texten… det kan ta en halv minut.";
+        try { terms = await aiExtract(text); usedAi = true; }
+        catch (e) {
+          console.warn("Textanalys misslyckades:", e);
+          notice = "AI:n svarade inte, så ett enklare urval användes. ";
+          terms = localExtract(text);
+        }
+      } else {
+        notice = "Utan AI blir urvalet enklare: vanliga ord tas bort och översättning görs när kortet läggs till. ";
+        terms = localExtract(text);
+      }
+    } finally { submit.disabled = false; }
+
+    // Ta bort dubbletter och ord som redan finns i Mina kort
+    const seen = new Set();
+    terms = terms.filter(t => {
+      const k = (t.es || t.sv || "").trim().toLowerCase();
+      if (!k || seen.has(k)) return false;
+      seen.add(k);
+      return !cards.some(c => (t.es && sameText(c.es, t.es)) || (t.sv && sameText(c.sv, t.sv)));
+    });
+    if (!terms.length) { status.textContent = notice + "Hittade inga nya begrepp i texten."; return; }
+    runSwipe(terms, usedAi, notice);
+  };
+}
+
+function runSwipe(terms, usedAi, notice) {
+  titleEl.textContent = "Välj kort";
+  goBack = showImport; reopen = showImport;
+  render("tpl-swipe", "swipe");
+  const stack = $("#swipeStack"), info = $("#swipeInfo");
+  const history = [];        // för ångra: { cardId } eller { cardId: null }
+  let index = 0, added = 0, busy = false;
+
+  function makeCard(t) {
+    const c = el("div", "swipe-card");
+    c.append(el("div", "stamp yes", "LÄGG TILL"), el("div", "stamp no", "HOPPA ÖVER"));
+    c.append(el("small", "lang-tag", "Español"), el("div", "sc-es", t.es || "—"));
+    c.append(el("small", "lang-tag2", "Svenska"), el("div", "sc-sv", t.sv || "översätts när kortet läggs till"));
+    if (!t.sv) c.querySelector(".sc-sv").classList.add("muted");
+    if (t.note) c.append(el("div", "sc-note", t.note));
+    if (t.es) {
+      const b = el("button", "sc-speak", "🔊");
+      b.onpointerdown = e => e.stopPropagation();
+      b.onclick = e => { e.stopPropagation(); speak(t.es); };
+      c.append(b);
+    }
+    return c;
+  }
+
+  function show() {
+    stack.innerHTML = "";
+    if (index >= terms.length) return finish();
+    if (terms[index + 1]) stack.append(Object.assign(makeCard(terms[index + 1]), { className: "swipe-card behind" }));
+    const top = makeCard(terms[index]);
+    stack.append(top);
+    attachDrag(top);
+    info.textContent = (index === 0 && notice ? notice : "") + `${index + 1} / ${terms.length} · ${added} tillagda`;
+    $("#btnSwipeUndo").disabled = history.length === 0;
+  }
+
+  function decide(add) {
+    if (busy || index >= terms.length) return;
+    busy = true;
+    const top = stack.querySelector(".swipe-card:not(.behind)");
+    if (top) {
+      top.style.transition = "transform .25s ease-out, opacity .25s";
+      top.style.transform = `translateX(${add ? 140 : -140}%) rotate(${add ? 25 : -25}deg)`;
+      top.style.opacity = "0";
+    }
+    setTimeout(() => {
+      const t = terms[index];
+      if (add) {
+        const c = newCard(t.sv, t.es);
+        if (usedAi && t.sv && t.es) { c.check = { status: "ok", byAi: true }; c.filledBy = "ai"; }
+        cards.unshift(c); saveCards();
+        history.push({ cardId: c.id }); added++;
+      } else history.push({ cardId: null });
+      index++; busy = false;
+      show();
+      if (add) processQueue();
+    }, top ? 250 : 0);
+  }
+
+  function undo() {
+    if (busy || !history.length) return;
+    const h = history.pop();
+    if (h.cardId) { cards = cards.filter(c => c.id !== h.cardId); saveCards(); added--; }
+    index--;
+    show();
+  }
+
+  function attachDrag(card) {
+    let startX = 0, startY = 0, dx = 0, dy = 0, dragging = false;
+    const yes = card.querySelector(".stamp.yes"), no = card.querySelector(".stamp.no");
+    card.onpointerdown = e => {
+      dragging = true; startX = e.clientX; startY = e.clientY; dx = dy = 0;
+      card.setPointerCapture(e.pointerId);
+      card.style.transition = "none";
+    };
+    card.onpointermove = e => {
+      if (!dragging) return;
+      dx = e.clientX - startX; dy = e.clientY - startY;
+      card.style.transform = `translate(${dx}px, ${dy * 0.3}px) rotate(${dx / 15}deg)`;
+      yes.style.opacity = Math.max(0, Math.min(1, dx / 100));
+      no.style.opacity = Math.max(0, Math.min(1, -dx / 100));
+    };
+    const end = () => {
+      if (!dragging) return;
+      dragging = false;
+      if (dx > 100) decide(true);
+      else if (dx < -100) decide(false);
+      else {
+        card.style.transition = "transform .2s";
+        card.style.transform = "";
+        yes.style.opacity = 0; no.style.opacity = 0;
+      }
+    };
+    card.onpointerup = end;
+    card.onpointercancel = end;
+  }
+
+  function finish() {
+    render("tpl-swipe-done", "swipe-done");
+    goBack = showMyCards;
+    $("#swipeDoneTitle").textContent = added ? `${added} nya kort!` : "Inga kort tillagda";
+    $("#swipeDoneText").textContent = added
+      ? `Du valde ${added} av ${terms.length} begrepp. De finns nu i Mina kort.`
+      : "Du hoppade över alla begrepp.";
+    $("#btnToMyCards").onclick = showMyCards;
+    $("#btnImportMore").onclick = () => { save(LS_IMPORT_DRAFT, ""); showImport(); };
+    processQueue();
+  }
+
+  $("#btnSwipeYes").onclick = () => decide(true);
+  $("#btnSwipeNo").onclick = () => decide(false);
+  $("#btnSwipeUndo").onclick = undo;
+  document.onkeydown = e => {
+    if (e.key === "ArrowRight") decide(true);
+    else if (e.key === "ArrowLeft") decide(false);
+    else if (e.key === "Backspace" || (e.key === "z" && (e.ctrlKey || e.metaKey))) { e.preventDefault(); undo(); }
+  };
+  show();
 }
 
 // =====================================================================
