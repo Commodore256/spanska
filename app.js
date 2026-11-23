@@ -103,12 +103,89 @@ async function aiCheck(sv, es) {
   });
 }
 
-// Reserv utan AI: gratis översättningstjänst (MyMemory). Ingen stavningskontroll.
-async function freeTranslate(text, from, to) {
+// ---------- Reserv utan AI ----------
+// Korta begrepp (1–3 ord) slås upp i ett lexikon (svenska Wiktionary).
+// Längre meningar och ord som inte finns i lexikonet går till MyMemory (bra på meningar).
+const SHORT_MAX_WORDS = 3;
+function wordCount(t) { return (t || "").trim().split(/\s+/).filter(Boolean).length; }
+
+const SV_PREFIX = /^(att|en|ett)\s+/i;
+const ES_ARTICLE = /^(el|la|los|las|un|una|unos|unas)\s+/i;
+
+async function wiktionaryText(page) {
+  const url = "https://sv.wiktionary.org/w/api.php?action=parse&format=json&origin=*&redirects=1&prop=wikitext&page="
+    + encodeURIComponent(page);
+  const data = await fetchJson(url, {}, 8000);
+  return data?.parse?.wikitext?.["*"] || "";
+}
+function cleanWiki(t) {
+  return t
+    .replace(/\{\{[^{}]*\}\}/g, "")                 // mallar
+    .replace(/\[\[([^\]|]*\|)?([^\]]*)\]\]/g, "$2") // [[länk|text]] → text
+    .replace(/'{2,}/g, "")
+    .replace(/\([^)]*\)/g, "")
+    .split(/[;:]/)[0]
+    .replace(/\s+/g, " ").trim();
+}
+// svenska → spanska: svenska Wiktionary har översättningstabeller med {{ö|es|ord}}
+async function lexiconSvToEs(sv) {
+  const base = sv.trim().toLowerCase().replace(SV_PREFIX, "");
+  if (wordCount(base) > 2) return null;
+  const wiki = await wiktionaryText(base);
+  const found = [...wiki.matchAll(/\{\{ö\+?\|es\|([^}|]+)/g)].map(m => m[1].trim());
+  const words = [...new Set(found)].filter(Boolean);
+  if (!words.length) return null;
+  return words.slice(0, 2).join(" / ");          // högst två förslag, t.ex. "ayudar / asistir"
+}
+// spanska → svenska: svenska Wiktionary har spanska uppslagsord med definitioner på svenska
+async function lexiconEsToSv(es) {
+  const base = es.trim().toLowerCase().replace(/^[¿¡]|[?!]$/g, "").replace(ES_ARTICLE, "");
+  if (wordCount(base) > 2) return null;
+  const wiki = await wiktionaryText(base);
+  const start = wiki.search(/^==\s*Spanska\s*==\s*$/m);
+  if (start < 0) return null;
+  const rest = wiki.slice(start + 5);
+  const end = rest.search(/^==[^=]/m);
+  const section = end < 0 ? rest : rest.slice(0, end);
+  const line = section.split("\n").find(l => /^#[^:*#]/.test(l));
+  if (!line) return null;
+  let sv = cleanWiki(line.replace(/^#\s*/, ""));
+  if (!sv) return null;
+  if (/(ar|er|ir|arse|erse|irse)$/.test(base) && !/^att /.test(sv) && wordCount(sv) <= 2) sv = "att " + sv;  // verb
+  return sv;
+}
+async function myMemory(text, from, to) {
   const url = "https://api.mymemory.translated.net/get?q=" + encodeURIComponent(text) + "&langpair=" + from + "|" + to;
   const data = await fetchJson(url, {}, 10000);
+  const bad = t => !t || /MYMEMORY WARNING|INVALID|QUERY LENGTH/i.test(t);
+  // För korta ord: välj den bästa träffen som gäller exakt samma ord
+  if (wordCount(text) <= SHORT_MAX_WORDS && Array.isArray(data?.matches)) {
+    const q = text.trim().toLowerCase();
+    const best = data.matches
+      .filter(m => (m.segment || "").trim().toLowerCase() === q && !bad(m.translation))
+      .sort((a, b) => (Number(b.quality) || 0) - (Number(a.quality) || 0) || (b.match || 0) - (a.match || 0))[0];
+    if (best && looksLikeGloss(text, best.translation)) return best.translation.trim();
+  }
   const out = data?.responseData?.translatedText;
-  return out && !/MYMEMORY WARNING|INVALID/i.test(out) ? out : null;
+  if (bad(out)) return null;
+  // Skräpskydd för korta ord: MyMemory returnerar ibland en bit av en helt annan mening
+  if (wordCount(text) <= SHORT_MAX_WORDS && !looksLikeGloss(text, out)) return null;
+  return out.trim();
+}
+function looksLikeGloss(src, out) {
+  const t = out.trim();
+  return wordCount(t) <= wordCount(src) + 2 && !/[-–,;:]$/.test(t) && !/[,;]/.test(t);
+}
+// Returnerar { text, by: "lex" | "mt" } eller null
+async function freeTranslate(text, from, to) {
+  if (wordCount(text) <= SHORT_MAX_WORDS) {
+    try {
+      const t = from === "sv" ? await lexiconSvToEs(text) : await lexiconEsToSv(text);
+      if (t) return { text: t, by: "lex" };
+    } catch { /* inte i lexikonet – prova MyMemory */ }
+  }
+  const t = await myMemory(text, from, to);
+  return t ? { text: t, by: "mt" } : null;
 }
 
 function sameText(a, b) { return (a || "").trim().toLowerCase() === (b || "").trim().toLowerCase(); }
@@ -116,8 +193,8 @@ function sameText(a, b) { return (a || "").trim().toLowerCase() === (b || "").tr
 async function processCard(card) {
   if (aiEnabled()) {
     const r = await aiCheck(card.sv, card.es);         // kastar fel vid nätverksproblem → försök igen senare
-    if (!card.sv && r.sv) { card.sv = r.sv.trim(); card.filled = "sv"; }
-    if (!card.es && r.es) { card.es = r.es.trim(); card.filled = "es"; }
+    if (!card.sv && r.sv) { card.sv = r.sv.trim(); card.filled = "sv"; card.filledBy = "ai"; }
+    if (!card.es && r.es) { card.es = r.es.trim(); card.filled = "es"; card.filledBy = "ai"; }
     const svFix = r.svFix && !sameText(r.svFix, card.sv) ? r.svFix.trim() : null;
     const esFix = r.esFix && !sameText(r.esFix, card.es) ? r.esFix.trim() : null;
     const missing = !card.sv || !card.es;
@@ -128,8 +205,13 @@ async function processCard(card) {
     };
   } else {
     try {
-      if (!card.es && card.sv) { const t = await freeTranslate(card.sv, "sv", "es"); if (t) { card.es = t; card.filled = "es"; } }
-      else if (!card.sv && card.es) { const t = await freeTranslate(card.es, "es", "sv"); if (t) { card.sv = t; card.filled = "sv"; } }
+      if (!card.es && card.sv) {
+        const t = await freeTranslate(card.sv, "sv", "es");
+        if (t) { card.es = t.text; card.filled = "es"; card.filledBy = t.by; }
+      } else if (!card.sv && card.es) {
+        const t = await freeTranslate(card.es, "es", "sv");
+        if (t) { card.sv = t.text; card.filled = "sv"; card.filledBy = t.by; }
+      }
     } catch { /* offline eller tjänsten svarar inte */ }
     const missing = !card.sv || !card.es;
     card.check = missing
@@ -389,8 +471,11 @@ function cardRow(c) {
 
   const cols = el("div", "cols");
   const sv = el("span", "sv", c.sv || "—"), es = el("span", "es", c.es || "—");
-  if (c.filled === "sv") sv.append(el("small", "ai-tag", " 🤖"));
-  if (c.filled === "es") es.append(el("small", "ai-tag", " 🤖"));
+  const tag = { ai: " 🤖", lex: " 📖", mt: " 🌐" }[c.filledBy || "ai"];
+  const tagTitle = { ai: "Översatt av AI", lex: "Från lexikon (Wiktionary)", mt: "Maskinöversatt (MyMemory)" }[c.filledBy || "ai"];
+  const mk = () => { const t = el("small", "ai-tag", tag); t.title = tagTitle; return t; };
+  if (c.filled === "sv") sv.append(mk());
+  if (c.filled === "es") es.append(mk());
   cols.append(sv, es);
 
   const actions = el("div", "actions");
