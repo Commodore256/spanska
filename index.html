@@ -28,7 +28,7 @@
   <header class="topbar">
     <button id="btnHome" class="icon-btn" title="Tillbaka" aria-label="Tillbaka">⌂</button>
     <button id="btnMenu" class="icon-btn" title="Konfigar" aria-label="Konfigar">☰</button>
-    <h1><span id="title">¡Hola! Spanska</span> <small id="version" class="version"></small></h1>
+    <h1><span id="title">¡Hola! Spanska</span> <small id="version" class="version"></small> <small id="syncState" class="sync-state"></small></h1>
     <button id="btnSettings" class="icon-btn" title="Inställningar" aria-label="Inställningar">⚙</button>
     <button id="btnFull" class="icon-btn" title="Helskärm" aria-label="Helskärm">⛶</button>
   </header>
@@ -283,6 +283,15 @@
 
   <template id="tpl-settings">
     <section class="settings">
+      <h2>Konto</h2>
+      <div id="acctBox" class="setting-row acct">
+        <span class="setting-text"><b>👥 Delat konto</b><small id="acctStatus" class="muted"></small></span>
+        <span class="acct-btns">
+          <button id="btnSyncNow" class="btn-small">🔄 Synka nu</button>
+          <button id="btnLogout" class="btn-small">Logga ut</button>
+        </span>
+      </div>
+
       <h2>Utseende</h2>
       <div class="setting-row">
         <span class="setting-text"><b>🌙 Mörkt läge</b><small class="muted">Mörk bakgrund och ljus text</small></span>
@@ -564,6 +573,27 @@
     </section>
   </template>
 
+  <!-- Inloggning -->
+  <template id="tpl-login">
+    <section class="login">
+      <div id="loginCard" class="login-card">
+        <div class="login-logo">Ñ</div>
+        <h1>¡Hola!</h1>
+        <p class="muted">Logga in för att öva. Alla som använder appen delar samma konto, så kort och framsteg syns på alla enheter.</p>
+        <form id="loginForm" autocomplete="on">
+          <label class="field">Lösenord
+            <span class="pw-row">
+              <input id="loginPw" type="password" autocomplete="current-password" spellcheck="false" autocapitalize="off">
+              <button id="loginShow" type="button" class="btn-small" title="Visa/dölj lösenordet">👁</button>
+            </span>
+          </label>
+          <button id="loginBtn" class="adv-btn big" type="submit">Logga in</button>
+        </form>
+        <p id="loginMsg" class="login-msg"></p>
+      </div>
+    </section>
+  </template>
+
   <template id="tpl-done">
     <section class="done">
       <div class="big">🎉</div>
@@ -576,10 +606,12 @@
     </section>
   </template>
 
+  <script src="config.js"></script>
   <script src="version.js"></script>
   <script src="words.js"></script>
   <script src="verbs.js"></script>
   <script src="app.js"></script>
+  <script src="sync.js"></script>
   <script src="adventure.js"></script>
 </body>
 </html>

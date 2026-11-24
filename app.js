@@ -14,6 +14,7 @@ function load(key, fallback) {
 }
 function save(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* full eller blockerad */ }
+  if (typeof onLocalSave === "function") onLocalSave(key);   // synk med kontot (sync.js)
 }
 
 // =====================================================================
@@ -332,8 +333,17 @@ function isUnchecked(c) { return ["pending", "unchecked"].includes(c.check?.stat
 // =====================================================================
 //  AI: översättning och stavningskontroll
 // =====================================================================
-function aiConfig() { return load(LS_AI, { url: "", key: "" }); }
-function aiEnabled() { const c = aiConfig(); return !!(c.url && c.key); }
+// AI: egen adress och appnyckel under ⚙, annars kontots inloggning (sync.js)
+function aiConfig() {
+  const c = load(LS_AI, { url: "", key: "" }) || {};
+  if ((!c.url || !c.key) && typeof syncOn === "function" && syncOn() && syncToken()) return { url: WORKER_URL, key: "", token: syncToken() };
+  return c;
+}
+function aiEnabled() { const c = aiConfig(); return !!(c.url && (c.key || c.token)); }
+function aiHeaders(c) {
+  return c.key ? { "Content-Type": "application/json", "X-App-Key": c.key }
+               : { "Content-Type": "application/json", "Authorization": "Bearer " + c.token };
+}
 
 async function fetchJson(url, options = {}, timeoutMs = 20000) {
   const ctrl = new AbortController();
@@ -354,10 +364,10 @@ function aiCfgPayload(c = cfg()) {
 
 // Frågar Claude via din Cloudflare Worker. Svar: { sv, es, svFix, esFix, note }
 async function aiCheck(sv, es, c = cfg()) {
-  const { url, key } = aiConfig();
+  const ai = aiConfig(), url = ai.url;
   return fetchJson(url.replace(/\/+$/, ""), {
     method: "POST",
-    headers: { "Content-Type": "application/json", "X-App-Key": key },
+    headers: aiHeaders(ai),
     body: JSON.stringify({ sv, es, cfg: aiCfgPayload(c) })
   });
 }
@@ -570,6 +580,8 @@ function render(tplId, name) {
   view.appendChild(document.getElementById(tplId).content.cloneNode(true));
   view.scrollTop = 0;
   playClass(view, "view-enter");
+  document.body.classList.remove("login-mode");
+  if (typeof onViewChange === "function") onViewChange(name);
   currentView = name;
 }
 function $(sel) { return view.querySelector(sel); }
@@ -1246,11 +1258,11 @@ function localExtract(text) {
 }
 
 async function aiExtract(text) {
-  const { url, key } = aiConfig();
+  const ai = aiConfig(), url = ai.url;
   const known = cards.map(c => isLanguage() ? c.es : c.sv).filter(Boolean).slice(0, 400);
   const r = await fetchJson(url.replace(/\/+$/, ""), {
     method: "POST",
-    headers: { "Content-Type": "application/json", "X-App-Key": key },
+    headers: aiHeaders(ai),
     body: JSON.stringify({ mode: "extract", text, known, cfg: aiCfgPayload() })
   }, 90000);
   return Array.isArray(r.terms) ? r.terms : [];
@@ -2431,6 +2443,7 @@ function showSettings() {
   titleEl.textContent = "Inställningar";
   render("tpl-settings", "settings");
   goBack = back;
+  if (typeof setupAccountSettings === "function") setupAccountSettings();
   const dark = $("#darkToggle");
   dark.checked = currentTheme() === "dark";
   dark.onchange = () => setTheme(dark.checked ? "dark" : "light");

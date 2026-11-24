@@ -15,6 +15,9 @@ gör en commit och pushar till GitHub. Versionen syns uppe i appens titelrad.
 Stäng och öppna appen på enheterna för att få den nya versionen.
 
 ## Funktioner
+- **👥 Delat konto** (`sync.js`, `config.js`): när `WORKER_URL` i `config.js` är ifylld frågar appen efter lösenord,
+  och alla som loggar in delar samma kort, XP, streak och märken. Ändringar från olika enheter slås ihop.
+  ☁️ vid versionsnumret = synkat. ⚙ → Konto: Synka nu / Logga ut. Se `ai-worker/AI-INSTALLATION.md`.
 - **🗺️ Äventyr** (startsidan och Öva-menyn, logik i `adventure.js`): en stig med delar (Grundord, Spanska steg 3,
   dina kategorier), lektioner om 5 ord, skattkistor och en kontrollpunkt 🏆 per del. Nästa nivå låses upp först när
   alla övningar i lektionen är rätt – fel kommer tillbaka på slutet. Övningar: flerval, lyssna, skriv, ordbank,
