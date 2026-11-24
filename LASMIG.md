@@ -15,6 +15,13 @@ gör en commit och pushar till GitHub. Versionen syns uppe i appens titelrad.
 Stäng och öppna appen på enheterna för att få den nya versionen.
 
 ## Funktioner
+- **▶ Öva** öppnar en meny med sätt att öva: Flashcards, Flerval (felsvaren liknar det rätta), Skrivförhör, Memory,
+  Lyssna och skriv, Uttal (mikrofon, Chrome) och Verbböjning (spanska, 39 verb i presens/preteritum/imperfekt/futurum
+  – finns i `verbs.js`). Nya sätt läggs till i listan `MODES` i `app.js`.
+- **🔥 Streak** (dagar i rad) och **🎯 dagsmål** (tryck på ringen eller ändra under ⚙) på startsidan.
+- **Combo**: 5 rätt i rad ger ×2 XP, 10 rätt i rad ×3 XP.
+- **🏅 Märken & statistik**: 24 märken och XP-kursen (XP per dag som en aktiekurs, 7/30/90 dagar/allt).
+- **📅 Smart repetition** (⚙, på som standard): korten kommer tillbaka efter 1, 3, 7, 14 och 30 dagar.
 - **XP och nivåer** (överst på startsidan): +3 XP för rätt svar, +1 XP för fel (du övade ändå), +50 XP första
   gången ett kort blir fullt inlärt (5 rätt i rad). Nivå 2 vid 100 XP, 3 vid 300, 4 vid 600 … XP gäller alla konfigar.
   Räknarna **kort övade** och **fullt inlärda** gäller aktiv konfig.

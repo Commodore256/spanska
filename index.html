@@ -68,6 +68,17 @@
             <span class="c-icon">🏆</span><b id="cntMastered">0</b><small>fullt inlärda</small>
           </div>
         </div>
+        <div class="daily-row">
+          <div class="streak-chip" title="Dagar i rad som du har övat">
+            <span class="flame">🔥</span><b id="streakNum">0</b><small id="streakTxt">dagar i rad</small>
+          </div>
+          <button id="btnGoal" class="goal" title="Dagsmål – tryck för att ändra">
+            <svg viewBox="0 0 44 44" aria-hidden="true"><circle class="goal-bg" cx="22" cy="22" r="18"></circle>
+              <circle id="goalArc" class="goal-arc" cx="22" cy="22" r="18"></circle></svg>
+            <span class="goal-text"><b id="goalNum">0/20</b><small>idag 🎯</small></span>
+          </button>
+          <button id="btnAch" class="btn-small ach-btn">🏅 Märken<br>&amp; statistik</button>
+        </div>
         <small id="statsScope" class="muted stats-scope"></small>
       </div>
       <button id="btnMyCards" class="deck-btn mine">
@@ -130,10 +141,9 @@
         <span id="listCount" class="muted"></span>
       </div>
       <div class="practice-row">
-        <button class="btn secondary" data-practice="cards">🃏 Flashcards</button>
-        <button class="btn secondary" data-practice="write">⌨️ Skrivförhör</button>
+        <button id="btnPractice" class="btn secondary btn-practice">▶ Öva</button>
       </div>
-      <p class="muted small center">Övningen använder korten som visas i listan just nu.</p>
+      <p id="practiceInfo" class="muted small center">Övningen använder korten som visas i listan just nu.</p>
 
       <ul id="cardList" class="card-list"></ul>
     </section>
@@ -188,8 +198,7 @@
       <h2 id="deckName"></h2>
       <p id="deckStats" class="muted"></p>
       <div class="mode-grid">
-        <button class="mode" data-mode="cards"><span>🃏</span>Flashcards<small>Vänd kortet</small></button>
-        <button class="mode" data-mode="write"><span>⌨️</span>Skrivförhör<small>Skriv översättningen</small></button>
+        <button class="mode" data-mode="practice"><span>▶</span>Öva<small>Välj hur du vill öva</small></button>
         <button class="mode" data-mode="list"><span>📋</span>Ordlista<small>Se och lyssna</small></button>
       </div>
       <button id="btnCopyDeck" class="btn ghost">Kopiera lekens ord till Mina kort</button>
@@ -199,7 +208,7 @@
 
   <template id="tpl-cards">
     <section class="cards">
-      <div class="practice-head"><p id="progress" class="muted"></p>
+      <div class="practice-head"><p id="progress" class="muted"></p><span id="combo" class="combo hidden"></span>
       <div class="practice-tools">
         <button id="btnMark" class="tool" title="Gulmarkera kortet">🟡 <span>Gulmarkera</span></button>
         <button id="btnTrash" class="tool" title="Ta bort kortet">🗑 <span>Ta bort</span></button>
@@ -235,7 +244,7 @@
 
   <template id="tpl-write">
     <section class="write">
-      <div class="practice-head"><p id="progress" class="muted"></p>
+      <div class="practice-head"><p id="progress" class="muted"></p><span id="combo" class="combo hidden"></span>
       <div class="practice-tools">
         <button id="btnMark" class="tool" title="Gulmarkera kortet">🟡 <span>Gulmarkera</span></button>
         <button id="btnTrash" class="tool" title="Ta bort kortet">🗑 <span>Ta bort</span></button>
@@ -273,6 +282,17 @@
       <div class="setting-row">
         <span class="setting-text"><b>✨ Animationer</b><small class="muted">Vändande kort, konfetti och små effekter på knappar</small></span>
         <label class="switch"><input id="animToggle" type="checkbox" role="switch" aria-label="Animationer"><span class="slider"></span></label>
+      </div>
+
+      <h2>Övning</h2>
+      <div class="setting-row">
+        <span class="setting-text"><b>🎯 Dagsmål</b><small class="muted">Hur många kort du vill öva per dag</small></span>
+        <input id="goalInput" class="num-input" type="number" min="1" max="500" inputmode="numeric">
+      </div>
+      <div class="setting-row">
+        <span class="setting-text"><b>📅 Smart repetition</b><small class="muted">Korten kommer tillbaka när det är dags att repetera
+          dem (efter 1, 3, 7, 14 och 30 dagar). Av: korten du kan sämst övas först.</small></span>
+        <label class="switch"><input id="srToggle" type="checkbox" role="switch" aria-label="Smart repetition"><span class="slider"></span></label>
       </div>
 
       <h2>AI-koppling</h2>
@@ -335,6 +355,152 @@
     </section>
   </template>
 
+  <!-- Öva-menyn -->
+  <template id="tpl-practice">
+    <section class="practice-menu">
+      <h2>Hur vill du öva?</h2>
+      <p id="pmInfo" class="muted"></p>
+      <div id="pmGrid" class="pm-grid"></div>
+    </section>
+  </template>
+
+  <!-- Flerval -->
+  <template id="tpl-mc">
+    <section class="mc">
+      <div class="practice-head"><p id="progress" class="muted"></p><span id="combo" class="combo hidden"></span>
+        <div class="practice-tools">
+          <button id="btnMark" class="tool" title="Gulmarkera kortet">🟡 <span>Gulmarkera</span></button>
+          <button id="btnTrash" class="tool" title="Ta bort kortet">🗑 <span>Ta bort</span></button>
+        </div>
+      </div>
+      <div class="pbar"><i id="pbarFill"></i></div>
+      <div class="card static">
+        <small id="promptLang" class="lang-tag"></small>
+        <button id="btnSpeakQ" class="sc-speak" title="Lyssna">🔊</button>
+        <div id="prompt" class="card-text"></div>
+      </div>
+      <div id="options" class="mc-options"></div>
+      <div class="row"><button id="btnNext" class="btn secondary hidden">Nästa →</button></div>
+    </section>
+  </template>
+
+  <!-- Memory -->
+  <template id="tpl-memory">
+    <section class="memory">
+      <div class="practice-head"><p id="progress" class="muted"></p><span id="combo" class="combo hidden"></span></div>
+      <p class="muted small">Vänd två kort i taget och hitta paren som betyder samma sak.</p>
+      <div id="memGrid" class="mem-grid"></div>
+    </section>
+  </template>
+
+  <!-- Lyssna och skriv -->
+  <template id="tpl-listen">
+    <section class="listen">
+      <div class="practice-head"><p id="progress" class="muted"></p><span id="combo" class="combo hidden"></span>
+        <div class="practice-tools">
+          <button id="btnMark" class="tool" title="Gulmarkera kortet">🟡 <span>Gulmarkera</span></button>
+          <button id="btnTrash" class="tool" title="Ta bort kortet">🗑 <span>Ta bort</span></button>
+        </div>
+      </div>
+      <div class="pbar"><i id="pbarFill"></i></div>
+      <div class="card static listen-card">
+        <button id="btnPlay" class="round play" title="Spela igen">🔊</button>
+        <div class="row tight">
+          <button id="btnSlow" class="btn-small">🐢 Långsamt</button>
+          <button id="btnHint" class="btn-small">💡 Visa betydelse</button>
+        </div>
+        <div id="hint" class="muted hint-text hidden"></div>
+      </div>
+      <form id="writeForm" class="write-form" autocomplete="off">
+        <input id="answer" type="text" autocapitalize="off" spellcheck="false" placeholder="Skriv det du hör…">
+        <div class="accents" data-target="answer"></div>
+        <button class="btn good" type="submit">Rätta</button>
+      </form>
+      <div id="feedback" class="feedback hidden"></div>
+      <div class="row"><button id="btnNext" class="btn secondary hidden">Nästa →</button></div>
+    </section>
+  </template>
+
+  <!-- Uttal -->
+  <template id="tpl-speak">
+    <section class="speak">
+      <div class="practice-head"><p id="progress" class="muted"></p><span id="combo" class="combo hidden"></span>
+        <div class="practice-tools">
+          <button id="btnMark" class="tool" title="Gulmarkera kortet">🟡 <span>Gulmarkera</span></button>
+          <button id="btnTrash" class="tool" title="Ta bort kortet">🗑 <span>Ta bort</span></button>
+        </div>
+      </div>
+      <div class="pbar"><i id="pbarFill"></i></div>
+      <div class="card static">
+        <small class="lang-tag">Säg ordet</small>
+        <button id="btnSpeakQ" class="sc-speak" title="Lyssna på uttalet">🔊</button>
+        <div id="prompt" class="card-text"></div>
+        <div id="promptSv" class="muted"></div>
+      </div>
+      <div class="mic-wrap">
+        <button id="btnMic" class="round mic" title="Tryck och säg ordet">🎤</button>
+        <p id="micStatus" class="muted center">Tryck på mikrofonen och säg ordet.</p>
+      </div>
+      <div class="row">
+        <button id="btnSkip" class="btn ghost">Hoppa över</button>
+        <button id="btnNext" class="btn secondary hidden">Nästa →</button>
+      </div>
+    </section>
+  </template>
+
+  <!-- Verbböjning -->
+  <template id="tpl-verbs-start">
+    <section class="verbs-start">
+      <h2>🔤 Verbböjning</h2>
+      <p class="muted">Välj vilka tider du vill öva. Du får 10 frågor med vanliga verb.</p>
+      <div id="tenseChips" class="filters"></div>
+      <div class="row"><button id="btnStartVerbs" class="btn good">Starta ▶</button></div>
+    </section>
+  </template>
+  <template id="tpl-verbs">
+    <section class="verbs">
+      <div class="practice-head"><p id="progress" class="muted"></p><span id="combo" class="combo hidden"></span></div>
+      <div class="pbar"><i id="pbarFill"></i></div>
+      <div class="card static">
+        <small id="verbTense" class="lang-tag"></small>
+        <div id="verbInf" class="card-text"></div>
+        <div id="verbSv" class="muted"></div>
+        <div id="verbPerson" class="verb-person"></div>
+      </div>
+      <form id="writeForm" class="write-form" autocomplete="off">
+        <input id="answer" type="text" autocapitalize="off" spellcheck="false" lang="es" placeholder="Skriv verbformen…">
+        <div class="accents" data-target="answer"></div>
+        <button class="btn good" type="submit">Rätta</button>
+      </form>
+      <div id="feedback" class="feedback hidden"></div>
+      <div id="verbTable" class="verb-table hidden"></div>
+      <div class="row"><button id="btnNext" class="btn secondary hidden">Nästa →</button></div>
+    </section>
+  </template>
+
+  <!-- Märken & statistik -->
+  <template id="tpl-ach">
+    <section class="ach">
+      <div class="ticker">
+        <div class="ticker-head">
+          <div><small class="muted">📈 XP-KURSEN · XP per dag</small><div class="ticker-val"><b id="tkVal">0</b> <span>XP idag</span></div></div>
+          <div id="tkChange" class="tk-change"></div>
+        </div>
+        <div class="tk-ranges" role="group" aria-label="Tidsperiod">
+          <button class="chip" data-range="7">7 D</button>
+          <button class="chip active" data-range="30">30 D</button>
+          <button class="chip" data-range="90">90 D</button>
+          <button class="chip" data-range="all">Allt</button>
+        </div>
+        <div id="tkChart" class="tk-chart"></div>
+        <details class="tk-table"><summary>Visa som tabell</summary><table id="tkTable"></table></details>
+      </div>
+      <div class="ach-stats" id="achStats"></div>
+      <h2>🏅 Märken <small id="achCount" class="muted"></small></h2>
+      <div id="achGrid" class="ach-grid"></div>
+    </section>
+  </template>
+
   <template id="tpl-done">
     <section class="done">
       <div class="big">🎉</div>
@@ -349,6 +515,7 @@
 
   <script src="version.js"></script>
   <script src="words.js"></script>
+  <script src="verbs.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

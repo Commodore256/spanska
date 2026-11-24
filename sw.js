@@ -10,6 +10,7 @@ const FILES = [
   "./style.css",
   "./app.js",
   "./words.js",
+  "./verbs.js",
   "./manifest.json",
   "./icons/icon.svg",
   "./icons/icon-192.png",
@@ -17,28 +18,38 @@ const FILES = [
   "./icons/icon-maskable-512.png"
 ];
 
+// Installera: hämta ALLA filer på nytt direkt från servern (förbi webbläsarens cache).
 self.addEventListener("install", event => {
-  event.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
+  event.waitUntil(
+    caches.open(CACHE).then(c => c.addAll(FILES.map(f => new Request(f, { cache: "reload" }))))
+  );
   self.skipWaiting();
 });
 
+// Aktivera: ta bort gamla versioners cache.
 self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Nätverket först (så du alltid får senaste versionen), cachen om du är offline.
+// Nätverket först, och alltid kontrollera med servern att filen är färsk
+// (GitHub Pages låter annars webbläsaren använda gamla filer i 10 minuter).
+// Är du offline används cachen.
 self.addEventListener("fetch", event => {
-  if (event.request.method !== "GET") return;
+  const req = event.request;
+  if (req.method !== "GET" || new URL(req.url).origin !== self.location.origin) return;
   event.respondWith(
-    fetch(event.request)
+    fetch(req.url, { cache: "no-cache" })
       .then(resp => {
-        const copy = resp.clone();
-        caches.open(CACHE).then(c => c.put(event.request, copy));
+        if (resp.ok) {
+          const copy = resp.clone();
+          caches.open(CACHE).then(c => c.put(req, copy));
+        }
         return resp;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(req, { ignoreSearch: true }))
   );
 });

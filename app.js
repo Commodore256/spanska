@@ -200,6 +200,13 @@ function backfillStats() {
   }
   xp += Object.keys(st.mastered).length * XP_MASTER;
   if (xp) addXP(xp);
+  // Märkenas totaler får också det du redan gjort
+  const t = getTotals();
+  t.answers += cards.reduce((n, c) => n + (c.seen || 0), 0);
+  t.correct += cards.reduce((n, c) => n + (c.right || 0), 0);
+  t.mastered += Object.keys(st.mastered).length;
+  if (t.answers) t.configs = { ...t.configs, [activeId]: 1 };
+  saveTotals(t);
   return st;
 }
 function loadStats() {
@@ -207,22 +214,114 @@ function loadStats() {
   if (!stats || typeof stats !== "object") { stats = backfillStats(); save(lsKey("stats"), stats); }
   stats.studied = stats.studied || {}; stats.mastered = stats.mastered || {};
 }
-loadStats();
-
 function studiedCount() { return Object.keys(stats.studied).length; }
 function masteredCount() { return Object.keys(stats.mastered).length; }
 
 // Anropas varje gång ett kort besvaras i en övning. Returnerar vad som hände.
-function awardPractice(key, ok, box) {
-  let gained = ok ? XP_RIGHT : XP_WRONG, mastered = false;
-  stats.studied[key] = 1;
-  if (ok && box >= MAX_BOX && !stats.mastered[key]) {
-    stats.mastered[key] = 1; gained += XP_MASTER; mastered = true;
+// ---------- Dagar, streak, dagsmål och totaler (gäller alla konfigar) ----------
+function todayKey(d = new Date()) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function getDays() { return load("app.days", {}) || {}; }
+function getGoal() { return Math.max(1, Math.min(500, Number(load("app.goal", 20)) || 20)); }
+function todayCount() { return getDays()[todayKey()]?.n || 0; }
+function currentStreak() {
+  const days = getDays(), d = new Date();
+  if (!days[todayKey(d)]?.n) d.setDate(d.getDate() - 1);     // idag räknas när du har övat
+  let n = 0;
+  while (days[todayKey(d)]?.n) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+const TOTALS_DEFAULT = { answers: 0, correct: 0, mastered: 0, perfect: 0, maxCombo: 0, bestStreak: 0, goalDays: 0,
+  night: 0, early: 0, memoryWins: 0, listen: 0, speak: 0, verbs: 0, mc: 0, configs: {} };
+function getTotals() { return { ...TOTALS_DEFAULT, ...(load("app.totals", {}) || {}) }; }
+function saveTotals(t) { save("app.totals", t); }
+
+// Smart repetition: hur länge ett kort vilar innan det ska repeteras, per nivå (box)
+const SR_DAYS = [0, 1, 3, 7, 14, 30];
+function srOn() { return load("app.sr", "on") !== "off"; }
+
+// Anropas varje gång ett kort besvaras i en övning. Returnerar vad som hände.
+// opt: { mult (combo-multiplikator), mode (övningssätt), combo, isCard (räknas som kort), noBox (bara XP) }
+function awardPractice(key, ok, box, opt = {}) {
+  const { mult = 1, mode = "cards", combo = 0, isCard = true, noBox = false } = opt;
+  let gained = ok ? XP_RIGHT * mult : XP_WRONG, mastered = false;
+  if (isCard) {
+    stats.studied[key] = 1;
+    if (!noBox && ok && box >= MAX_BOX && !stats.mastered[key]) {
+      stats.mastered[key] = 1; gained += XP_MASTER; mastered = true;
+    }
+  }
+  if (!noBox) {
+    stats.due = stats.due || {};
+    stats.due[key] = Date.now() + (ok ? SR_DAYS[Math.min(box, MAX_BOX)] : 0) * 86400000;
   }
   save(lsKey("stats"), stats);
+
+  // Dagens siffror (för streak, dagsmål och XP-kursen)
+  const days = getDays(), k = todayKey(), d = days[k] || { n: 0, xp: 0 };
+  d.n++; d.xp += gained;
+  let goalReached = false;
+  if (!d.goalHit && d.n >= getGoal()) { d.goalHit = true; goalReached = true; }
+  days[k] = d; save("app.days", days);
+
+  // Totaler för märkena
+  const t = getTotals(), h = new Date().getHours();
+  t.answers++; if (ok) t.correct++;
+  if (mastered) t.mastered++;
+  if (goalReached) t.goalDays++;
+  if (h >= 22) t.night++;
+  if (h < 7) t.early++;
+  if (ok && ["listen", "speak", "verbs", "mc"].includes(mode)) t[mode]++;
+  t.maxCombo = Math.max(t.maxCombo, combo);
+  t.bestStreak = Math.max(t.bestStreak, currentStreak());
+  t.configs = { ...t.configs, [activeId]: 1 };
+  saveTotals(t);
+
   const levelUp = addXP(gained);
-  return { gained, mastered, levelUp };
+  const newAch = checkAchievements();
+  return { gained, mastered, levelUp, goalReached, newAch };
 }
+
+// ---------- Märken ----------
+const ACHIEVEMENTS = [
+  { id: "ans10", icon: "🌱", name: "Första stegen", desc: "Svara på 10 kort", goal: 10, val: t => t.answers },
+  { id: "ans100", icon: "📚", name: "Flitig", desc: "Svara på 100 kort", goal: 100, val: t => t.answers },
+  { id: "ans1000", icon: "🏃", name: "Maratonplugg", desc: "Svara på 1 000 kort", goal: 1000, val: t => t.answers },
+  { id: "m1", icon: "🥉", name: "Första guldet", desc: "Lär dig ett kort fullt ut", goal: 1, val: t => t.mastered },
+  { id: "m25", icon: "🥈", name: "Ordförrådet växer", desc: "25 fullt inlärda kort", goal: 25, val: t => t.mastered },
+  { id: "m100", icon: "🥇", name: "Levande ordbok", desc: "100 fullt inlärda kort", goal: 100, val: t => t.mastered },
+  { id: "s3", icon: "🔥", name: "Tre i rad", desc: "Öva 3 dagar i rad", goal: 3, val: t => t.bestStreak },
+  { id: "s7", icon: "📅", name: "En hel vecka", desc: "Öva 7 dagar i rad", goal: 7, val: t => t.bestStreak },
+  { id: "s30", icon: "👑", name: "Månadsmästare", desc: "Öva 30 dagar i rad", goal: 30, val: t => t.bestStreak },
+  { id: "g1", icon: "🎯", name: "Målet nått", desc: "Nå ditt dagsmål", goal: 1, val: t => t.goalDays },
+  { id: "g10", icon: "🏹", name: "Målmedveten", desc: "Nå dagsmålet 10 gånger", goal: 10, val: t => t.goalDays },
+  { id: "perfect", icon: "💯", name: "Felfri runda", desc: "Alla rätt på första försöket (minst 5 kort)", goal: 1, val: t => t.perfect },
+  { id: "c10", icon: "⚡", name: "Combo ×10", desc: "10 rätt i rad", goal: 10, val: t => t.maxCombo },
+  { id: "c25", icon: "🚀", name: "Ostoppbar", desc: "25 rätt i rad", goal: 25, val: t => t.maxCombo },
+  { id: "night", icon: "🦉", name: "Nattuggla", desc: "Öva efter kl. 22", goal: 1, val: t => t.night },
+  { id: "early", icon: "🐓", name: "Morgonpigg", desc: "Öva före kl. 7", goal: 1, val: t => t.early },
+  { id: "mc", icon: "🔘", name: "Flervalsfantast", desc: "50 rätt i Flerval", goal: 50, val: t => t.mc },
+  { id: "memory", icon: "🧠", name: "Minnesmästare", desc: "Klara 5 omgångar Memory", goal: 5, val: t => t.memoryWins },
+  { id: "listen", icon: "🎧", name: "Bra öron", desc: "20 rätt i Lyssna och skriv", goal: 20, val: t => t.listen },
+  { id: "speak", icon: "🎤", name: "Uttalsproffs", desc: "20 rätt i Uttal", goal: 20, val: t => t.speak },
+  { id: "verbs", icon: "🔤", name: "Böjningskung", desc: "50 rätt i Verbböjning", goal: 50, val: t => t.verbs },
+  { id: "lvl5", icon: "⭐", name: "Nivå 5", desc: "Nå nivå 5", goal: 5, val: () => levelFromXP(getXP()) },
+  { id: "lvl10", icon: "🌟", name: "Nivå 10", desc: "Nå nivå 10", goal: 10, val: () => levelFromXP(getXP()) },
+  { id: "poly", icon: "🌍", name: "Flerspråkig", desc: "Öva i två olika konfigar", goal: 2, val: t => Object.keys(t.configs || {}).length }
+];
+function unlockedAch() { return load("app.ach", {}) || {}; }
+// Låser upp märken som har nåtts. Returnerar de nya.
+function checkAchievements() {
+  const t = getTotals(), un = unlockedAch(), fresh = [];
+  for (const a of ACHIEVEMENTS) {
+    if (!un[a.id] && a.val(t) >= a.goal) { un[a.id] = Date.now(); fresh.push(a); }
+  }
+  if (fresh.length) save("app.ach", un);
+  return fresh;
+}
+function addTotal(name, n = 1) { const t = getTotals(); t[name] = (t[name] || 0) + n; saveTotals(t); return checkAchievements(); }
+loadStats();   // körs här, när allt som behövs ovan är definierat
 function saveCards() { save(lsKey("cards"), cards); }
 function cardById(id) { return cards.find(c => c.id === id); }
 
@@ -424,13 +523,13 @@ function pickVoice() {
   voice = voices.find(v => v.lang === tts) || voices.find(v => v.lang.startsWith(short)) || null;
 }
 if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
-function speak(text) {
+function speak(text, rate = 0.85) {
   if (!("speechSynthesis" in window) || !text || !isLanguage()) return;
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text.replace(/…/g, ""));
   u.lang = langInfo().tts;
   if (voice) u.voice = voice;
-  u.rate = 0.85;
+  u.rate = rate;
   speechSynthesis.speak(u);
 }
 
@@ -531,6 +630,8 @@ document.addEventListener("pointerdown", e => {
   b.append(rip);
   rip.addEventListener("animationend", () => rip.remove());
 });
+// Är vyn fortfarande kvar? (om man lämnat övningen under en animation)
+function alive(elem) { return !!elem && document.body.contains(elem); }
 function setPbar(done, total) {
   const f = view.querySelector("#pbarFill");
   if (f) f.style.width = (total ? Math.round(100 * done / total) : 0) + "%";
@@ -559,11 +660,17 @@ function showXP(res, from) {
     burst(from, ["🏆", "⭐", "✨", "💎", "🎉"], 16);
   }
   if (res.levelUp) {
-    setTimeout(() => {
-      toast(`⭐ Ny nivå: ${res.levelUp}!`);
-      burst({ x: innerWidth / 2, y: innerHeight / 3 }, ["⭐", "🌟", "✨", "🎊", "🎉"], 22);
-    }, res.mastered ? 1400 : 300);
+    toast(`⭐ Ny nivå: ${res.levelUp}!`);
+    setTimeout(() => burst({ x: innerWidth / 2, y: innerHeight / 3 }, ["⭐", "🌟", "✨", "🎊", "🎉"], 22), 300);
   }
+  if (res.goalReached) {
+    toast(`🎯 Dagsmålet nått! ${getGoal()} kort idag`);
+    setTimeout(() => burst({ x: innerWidth / 2, y: innerHeight / 3 }, ["🎯", "🔥", "✨", "🎉"], 18), 300);
+  }
+  announceAch(res.newAch);
+}
+function announceAch(list) {
+  for (const a of list || []) toast(`🏅 Nytt märke: ${a.icon} ${a.name}`);
 }
 
 function shuffle(arr) {
@@ -600,8 +707,9 @@ function showHome() {
   goBack = null; reopen = showHome;
   render("tpl-home", "home");
   const total = cards.length, known = cards.filter(isKnown).length, warn = cards.filter(isWarn).length;
+  const dueN = srOn() ? dueItems(myCardsDeck(cards.filter(c => c.sv && c.es)).items).length : 0;
   $("#myCardsInfo").textContent = total
-    ? `${total} kort · ${known} kan du` + (warn ? ` · ${warn} att rätta 🟡` : "")
+    ? `${total} kort · ${known} kan du` + (warn ? ` · ${warn} att rätta 🟡` : "") + (dueN ? ` · 📅 ${dueN} att repetera` : "")
     : (isLanguage() ? "Inga kort än – tryck här och lägg till dina egna ord" : "Inga kort än – tryck här och lägg till begrepp");
   $("#myCardsBar").dataset.w = total ? `${Math.round(100 * cards.reduce((s, c) => s + c.box, 0) / (total * MAX_BOX))}%` : "0%";
   $("#btnMyCards").onclick = showMyCards;
@@ -666,7 +774,31 @@ function renderStatsPanel() {
   requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.width = bar.dataset.w; }));
   countUp($("#cntStudied"), studiedCount());
   countUp($("#cntMastered"), masteredCount());
-  $("#statsScope").textContent = `Räknarna gäller ${cfg().icon || ""} ${cfg().name}. XP och nivå gäller alla konfigar.`;
+  $("#statsScope").textContent = `Räknarna gäller ${cfg().icon || ""} ${cfg().name}. XP, streak och dagsmål gäller alla konfigar.`;
+  // Streak
+  const st = currentStreak(), practicedToday = todayCount() > 0;
+  $("#streakNum").textContent = st;
+  $("#streakTxt").textContent = st === 1 ? "dag i rad" : "dagar i rad";
+  view.querySelector(".streak-chip").classList.toggle("cold", !practicedToday);
+  view.querySelector(".streak-chip").title = practicedToday
+    ? "Du har övat idag – bra jobbat!" : (st ? "Öva idag för att hålla din streak vid liv!" : "Öva idag för att starta en streak!");
+  // Dagsmål
+  const goal = getGoal(), n = todayCount(), arc = $("#goalArc"), C = 2 * Math.PI * 18;
+  $("#goalNum").textContent = `${Math.min(n, goal)}/${goal}`;
+  arc.style.strokeDasharray = C;
+  arc.style.strokeDashoffset = C;
+  view.querySelector(".goal").classList.toggle("done", n >= goal);
+  requestAnimationFrame(() => requestAnimationFrame(() => { arc.style.strokeDashoffset = C * (1 - Math.min(1, n / goal)); }));
+  $("#btnGoal").onclick = () => {
+    const v = prompt("Hur många kort vill du öva per dag?", String(goal));
+    if (v === null) return;
+    const num = Math.round(Number(v));
+    if (!num || num < 1 || num > 500) { toast("Skriv ett tal mellan 1 och 500"); return; }
+    save("app.goal", num);
+    toast(`🎯 Nytt dagsmål: ${num} kort`);
+    renderStatsPanel();
+  };
+  $("#btnAch").onclick = showAch;
   playClass($("#lvlBadge"), "pop");
 }
 
@@ -715,7 +847,6 @@ function showMyCards() {
     inSv.placeholder = "t.ex. inflation"; inEs.placeholder = "lämna tom så skriver AI:n";
     inEs.lang = "sv";
     $("#addHelp").textContent = "Skriv begreppet, och förklaringen om du vill. Lämnar du förklaringen tom skriver AI:n en (kräver AI under ⚙).";
-    view.querySelector('[data-practice="write"]').classList.add("hidden");
   }
   [inSv, inEs].forEach(inp => inp.addEventListener("focus", () => { accents.dataset.lastTarget = inp.id; }));
   setupAccents(view);
@@ -763,14 +894,10 @@ function showMyCards() {
   sortSel.value = listSort;
   sortSel.onchange = () => { listSort = sortSel.value; save(lsKey("sort"), listSort); renderCardList(); };
 
-  view.querySelectorAll("[data-practice]").forEach(b => {
-    b.onclick = () => {
-      const usable = filteredCards().filter(c => c.sv && c.es);
-      if (!usable.length) { alert("Det finns inga färdiga kort (med båda språken) i listan just nu."); return; }
-      const deck = myCardsDeck(usable);
-      b.dataset.practice === "cards" ? runCards(deck) : runWrite(deck);
-    };
-  });
+  $("#btnPractice").onclick = () => {
+    const usable = filteredCards().filter(c => c.sv && c.es);
+    showPracticeMenu(myCardsDeck(usable));
+  };
 
   renderCardList();
   processQueue();
@@ -796,6 +923,14 @@ function renderCardList() {
   updateAiStatus();
   const list = filteredCards();
   $("#listCount").textContent = `${list.length} av ${cards.length} kort`;
+  const info = view.querySelector("#practiceInfo");
+  if (info) {
+    const usable = list.filter(c => c.sv && c.es);
+    const due = srOn() ? dueItems(myCardsDeck(usable).items).length : 0;
+    info.textContent = srOn() && due
+      ? `📅 ${due} kort att repetera idag bland korten som visas i listan.`
+      : (srOn() && usable.length ? "📅 Inga kort att repetera idag – du kan öva i förväg." : "Övningen använder korten som visas i listan just nu.");
+  }
   ul.innerHTML = "";
   if (!list.length) {
     ul.append(el("li", "empty muted", cards.length ? "Inga kort matchar filtret." : "Inga kort än. Skriv ett ord ovanför!"));
@@ -938,19 +1073,28 @@ function toggleYellow(c) {
 }
 function deleteCard(c) { cards = cards.filter(x => x.id !== c.id); saveCards(); }
 
-let toastTimer = null;
+// Meddelanden visas ett i taget, i tur och ordning
+const toastQueue = [];
+let toastBusy = false;
 function toast(text) {
+  toastQueue.push(text);
+  if (!toastBusy) nextToast();
+}
+function nextToast() {
   const t = document.getElementById("toast");
+  const text = toastQueue.shift();
+  if (text === undefined) { toastBusy = false; return; }
+  toastBusy = true;
   t.textContent = text;
   t.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+  setTimeout(() => { t.classList.remove("show"); setTimeout(nextToast, 250); }, 2000);
 }
 
 // Gör om Mina kort till en "lek" för övningarna
 function myCardsDeck(list) {
   return {
     id: "mina", name: "Mina kort", back: showMyCards,
+    refresh: () => myCardsDeck(list.filter(c => cards.includes(c))),
     items: list.map(c => ({
       id: c.id, sv: c.sv, es: c.es,
       isYellow: () => isWarn(c),
@@ -958,18 +1102,22 @@ function myCardsDeck(list) {
       yellowText: on => on ? "🟡 Gulmarkerad – finns under 🟡 Att rätta" : "Gulmarkeringen borttagen",
       remove: () => deleteCard(c),
       box: () => c.box,
-      record: ok => {
+      key: "c:" + c.id,
+      due: () => stats.due?.["c:" + c.id] || 0,
+      record: (ok, opt = {}) => {
         c.seen++; c.lastSeen = Date.now();
         if (ok) { c.right++; c.box = clampBox(c.box + 1); } else { c.wrong++; c.box = 0; }
         saveCards();
-        return awardPractice("c:" + c.id, ok, c.box);
-      }
+        return awardPractice("c:" + c.id, ok, c.box, opt);
+      },
+      touch: (ok, opt = {}) => awardPractice("c:" + c.id, ok, c.box, { ...opt, noBox: true })
     }))
   };
 }
 function builtinDeck(deck) {
   return {
     id: deck.id, name: deck.name, back: () => showDeck(deck.id),
+    refresh: () => builtinDeck(deck),
     items: visibleWords(deck).map(([es, sv]) => ({
       id: deck.id + ":" + es, sv, es,
       // Gulmarkering av ett ord i en färdig lek: ordet kopieras till Mina kort som gult kort
@@ -982,10 +1130,13 @@ function builtinDeck(deck) {
       yellowText: on => on ? "🟡 Kopierad till Mina kort som gult kort" : "Gulmarkeringen borttagen i Mina kort",
       remove: () => hideWord(deck.id, es),
       box: () => getBox(deck.id, es),
-      record: ok => {
+      key: `d:${deck.id}:${es}`,
+      due: () => stats.due?.[`d:${deck.id}:${es}`] || 0,
+      record: (ok, opt = {}) => {
         setBox(deck.id, es, ok ? getBox(deck.id, es) + 1 : 0);
-        return awardPractice(`d:${deck.id}:${es}`, ok, getBox(deck.id, es));
-      }
+        return awardPractice(`d:${deck.id}:${es}`, ok, getBox(deck.id, es), opt);
+      },
+      touch: (ok, opt = {}) => awardPractice(`d:${deck.id}:${es}`, ok, getBox(deck.id, es), { ...opt, noBox: true })
     }))
   };
 }
@@ -1327,11 +1478,7 @@ function showDeck(deckId) {
   }
   const d = builtinDeck(deck);
   view.querySelectorAll(".mode").forEach(b => {
-    b.onclick = () => {
-      if (b.dataset.mode === "cards") runCards(d);
-      else if (b.dataset.mode === "write") runWrite(d);
-      else showList(deck);
-    };
+    b.onclick = () => { if (b.dataset.mode === "practice") showPracticeMenu(d); else showList(deck); };
   });
   $("#btnCopyDeck").onclick = () => {
     let added = 0;
@@ -1361,16 +1508,51 @@ function showList(deck) {
 //  Övningar (gemensamma för färdiga lekar och Mina kort)
 // =====================================================================
 // Väljer de ord som behöver övas mest och slumpar riktning per kort
-function buildSession(deck) {
+function dueItems(items) { const now = Date.now(); return items.filter(i => (i.due ? i.due() : 0) <= now); }
+function buildSession(deck, size = SESSION_SIZE) {
   const dir = load(lsKey("dir"), "mix");
-  return shuffle(deck.items)
+  let pool = deck.items;
+  // Smart repetition: kort som ska repeteras idag först. Finns inga övar du i förväg.
+  if (srOn()) { const due = dueItems(pool); if (due.length) pool = due; }
+  return shuffle(pool)
     .sort((a, b) => a.box() - b.box())
-    .slice(0, SESSION_SIZE)
+    .slice(0, size)
     .map(item => ({ item, showSv: dir === "sv2es" ? true : dir === "es2sv" ? false : Math.random() < 0.5 }));
 }
 
 
-function showDone(deck, text, again, right = 0, total = 0) {
+// En övningsomgång: håller koll på combo (rätt i rad) och delar ut XP
+function practiceSession() {
+  let combo = 0;
+  const mult = () => combo >= 10 ? 3 : combo >= 5 ? 2 : 1;
+  function show() {
+    const b = view.querySelector("#combo");
+    if (!b) return;
+    if (combo >= 2) {
+      b.classList.remove("hidden");
+      b.textContent = `🔥 ${combo} i rad` + (mult() > 1 ? ` · ×${mult()} XP` : "");
+      playClass(b, "pop");
+    } else b.classList.add("hidden");
+  }
+  return {
+    // Svar på ett kort. retry = kortet kom tillbaka efter fel (ger ingen XP)
+    answer(item, ok, fromEl, mode, retry = false, xpOnly = false) {
+      combo = ok ? combo + 1 : 0;
+      let res = null;
+      if (!retry) {
+        const opt = { mult: ok ? mult() : 1, mode, combo };
+        res = xpOnly && item.touch ? item.touch(ok, opt) : item.record(ok, opt);
+        showXP(res, fromEl);
+      }
+      show();
+      return res;
+    },
+    breakCombo() { combo = 0; show(); }
+  };
+}
+
+function showDone(deck, text, again, right = 0, total = 0, { countPerfect = true } = {}) {
+  if (countPerfect && total >= 5 && right === total) announceAch(addTotal("perfect"));
   render("tpl-done", "done");
   $("#doneText").textContent = text;
   const big = view.querySelector(".big");
@@ -1413,6 +1595,7 @@ function runCards(deck) {
   goBack = deck.back; reopen = deck.back;
   const queue = buildSession(deck), total = queue.length;
   let right = 0, cur = null, flipped = false, revealed = false, busy = false, done = 0;
+  const sess = practiceSession();
   const card = $("#card"), front = $("#cardFront"), back = $("#cardBack");
   const answerRow = $("#answerRow");
   const refreshTools = practiceTools(() => cur, id => { dropFromQueue(queue, id); next(); });
@@ -1459,13 +1642,15 @@ function runCards(deck) {
   async function answer(ok, btn) {
     if (busy || !revealed) return;
     busy = true;
-    if (!cur.retry) { if (ok) right++; showXP(cur.item.record(ok), btn); }
+    if (ok && !cur.retry) right++;
+    sess.answer(cur.item, ok, btn, "cards", cur.retry);
     if (ok) { done++; burst(btn); }
     else queue.splice(Math.min(3, queue.length), 0, { ...cur, retry: true });   // kommer tillbaka snart
     setPbar(done, total);
-    if (!ok) { playClass(card, "shake"); await wait(260); }
+    if (!ok) { playClass(card, "shake"); await wait(260); if (!alive(card)) return; }
     card.classList.add(ok ? "out-right" : "out-left");
     await wait(330);
+    if (!alive(card)) return;
     card.classList.remove("out-right", "out-left");
     busy = false;
     next();
@@ -1490,6 +1675,7 @@ function runWrite(deck) {
   setupAccents(view);
   const queue = buildSession(deck), total = queue.length;
   let right = 0, cur = null, answered = false, done = 0;
+  const sess = practiceSession();
   const input = $("#answer"), feedback = $("#feedback"), btnNext = $("#btnNext");
   const promptCard = view.querySelector(".card.static");
   const refreshTools = practiceTools(() => cur, id => { dropFromQueue(queue, id); next(); });
@@ -1523,14 +1709,15 @@ function runWrite(deck) {
     const result = check(input.value, correct, showSv ? "es" : "sv");
     input.disabled = true;
     if (result !== "no") {
-      if (!cur.retry) { right++; showXP(item.record(true), promptCard); }
+      if (!cur.retry) right++;
+      sess.answer(item, true, promptCard, "write", cur.retry);
       feedback.className = "feedback " + (result === "ok" ? "ok" : "almost");
       feedback.textContent = result === "ok" ? `✓ Rätt! ${correct}` : `Nästan! Tänk på accenterna: ${correct}`;
       done++;
       playClass(promptCard, "pop");
       burst(promptCard, result === "ok" ? ["✨", "⭐", "🎉", "💫"] : ["⭐", "✨"], result === "ok" ? 12 : 6);
     } else {
-      if (!cur.retry) showXP(item.record(false), promptCard);
+      sess.answer(item, false, promptCard, "write", cur.retry);
       queue.splice(Math.min(3, queue.length), 0, { ...cur, retry: true });
       feedback.className = "feedback no";
       feedback.textContent = `Rätt svar: ${correct}`;
@@ -1544,6 +1731,684 @@ function runWrite(deck) {
   };
   btnNext.onclick = next;
   next();
+}
+
+// =====================================================================
+//  Öva-menyn
+// =====================================================================
+const MODES = [
+  { id: "cards", icon: "🃏", name: "Flashcards", desc: "Vänd korten och säg om du kunde", run: d => runCards(d) },
+  { id: "mc", icon: "🔘", name: "Flerval", desc: "Välj rätt bland fyra – felsvaren är luriga", run: d => runMC(d), min: 2 },
+  { id: "write", icon: "⌨️", name: "Skrivförhör", desc: "Skriv översättningen", run: d => runWrite(d), lang: true },
+  { id: "memory", icon: "🧠", name: "Memory", desc: "Vänd två kort i taget och hitta paren", run: d => runMemory(d), min: 3 },
+  { id: "listen", icon: "🎧", name: "Lyssna och skriv", desc: "Hör ordet och skriv det du hör", run: d => runListen(d), lang: true, tts: true },
+  { id: "speak", icon: "🎤", name: "Uttal", desc: "Säg ordet – appen lyssnar och rättar", run: d => runSpeak(d), lang: true, mic: true },
+  { id: "verbs", icon: "🔤", name: "Verbböjning", desc: "Böj vanliga verb i olika tider", run: d => runVerbsStart(d), es: true, noDeck: true }
+];
+function speechRecognitionClass() { return window.SpeechRecognition || window.webkitSpeechRecognition || null; }
+
+function showPracticeMenu(deck) {
+  if (deck.refresh) deck = deck.refresh();
+  titleEl.textContent = "Öva";
+  goBack = deck.back; reopen = () => showPracticeMenu(deck);
+  render("tpl-practice", "practice");
+  const n = deck.items.length;
+  $("#pmInfo").textContent = n
+    ? `${deck.name} · ${n} kort` + (srOn() ? ` · 📅 ${dueItems(deck.items).length} att repetera idag` : "")
+    : `${deck.name} · inga färdiga kort i listan just nu`;
+  const grid = $("#pmGrid");
+  // När en övning är klar kommer du tillbaka hit
+  const sub = { ...deck, back: () => showPracticeMenu(deck) };
+  MODES.forEach((m, i) => {
+    if (m.lang && !isLanguage()) return;
+    if (m.es && !(isLanguage() && cfg().lang === "es")) return;
+    let why = "";
+    if (!m.noDeck && n < (m.min || 1)) why = n ? `Behöver minst ${m.min} kort` : "Lägg till kort först";
+    if (m.mic && !speechRecognitionClass()) why = "Stöds inte i den här webbläsaren – prova Chrome";
+    if (m.tts && !("speechSynthesis" in window)) why = "Uppläsning stöds inte här";
+    const b = el("button", "pm-mode");
+    b.style.setProperty("--i", i);
+    b.append(el("span", "pm-icon", m.icon), el("b", "", m.name), el("small", "", why || m.desc));
+    if (why) { b.disabled = true; b.classList.add("off"); }
+    b.onclick = () => m.run(sub);
+    grid.append(b);
+  });
+}
+
+// =====================================================================
+//  Hjälp för jämförelser
+// =====================================================================
+function lev(a, b) {
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[n];
+}
+function similarity(a, b) { const L = Math.max(a.length, b.length); return L ? 1 - lev(a, b) / L : 1; }
+
+// =====================================================================
+//  Flerval – med felsvar som liknar det rätta
+// =====================================================================
+const LEAD_WORDS = ["el", "la", "los", "las", "un", "una", "att", "en", "ett", "the", "a", "to", "der", "die", "das", "le", "les", "il"];
+function distractorScore(c, a) {
+  let s = 0;
+  const ca = stripAccents(c), aa = stripAccents(a);
+  if (wordCount(c) === wordCount(a)) s += 3;
+  const fc = c.split(" ")[0], fa = a.split(" ")[0];
+  if (LEAD_WORDS.includes(fa) && fa === fc) s += 4;           // samma artikel / "att"
+  if (aa.slice(-2) === ca.slice(-2)) s += 3;                  // samma ändelse (-ar, -en …)
+  if (aa.slice(-3) === ca.slice(-3)) s += 1;
+  if (aa[0] === ca[0]) s += 1.5;                              // samma första bokstav
+  s += Math.max(0, 3 - Math.abs(a.length - c.length) / 2);    // ungefär lika långt
+  const d = lev(aa, ca);
+  if (d <= 3) s += 5 - d;                                     // nästan samma stavning
+  return s + Math.random() * 2;                               // lite slump så det varierar
+}
+// Påhittade felstavningar om det finns för få riktiga ord att välja bland
+function nearMisses(word) {
+  const out = new Set(), w = word.trim();
+  const swaps = [["a", "o"], ["o", "a"], ["e", "a"], ["i", "e"], ["ar", "er"], ["er", "ir"], ["ir", "ar"], ["en", "et"], ["et", "en"]];
+  for (const [x, y] of swaps) if (w.endsWith(x)) out.add(w.slice(0, -x.length) + y);
+  const acc = { a: "á", e: "é", i: "í", o: "ó", u: "ú" };
+  const plain = stripAccents(w);
+  if (plain !== w) out.add(plain);
+  else { const m = w.match(/[aeiou](?=[^aeiou]*[aeiou][^aeiou]*$)/); if (m) out.add(w.slice(0, m.index) + acc[m[0]] + w.slice(m.index + 1)); }
+  out.delete(w);
+  return [...out];
+}
+function mcPool(deck) {
+  const pairs = deck.items.map(i => ({ sv: i.sv, es: i.es }));
+  for (const c of cards) if (c.sv && c.es) pairs.push({ sv: c.sv, es: c.es });
+  if (hasBuiltinDecks()) for (const d of BUILTIN_DECKS) for (const [es, sv] of d.words) pairs.push({ sv, es });
+  return pairs;
+}
+function pickDistractors(answer, side, pool, n = 3) {
+  const A = answer.trim().toLowerCase();
+  const alts = A.split("/").map(x => x.trim());
+  const seen = new Set([A]), cands = [];
+  for (const p of pool) {
+    const c = (p[side] || "").trim(), C = c.toLowerCase();
+    if (!c || seen.has(C)) continue;
+    seen.add(C);
+    if (C.split("/").map(x => x.trim()).some(x => alts.includes(x))) continue;
+    cands.push({ text: c, score: distractorScore(C, A) });
+  }
+  cands.sort((x, y) => y.score - x.score);
+  const picked = cands.slice(0, n).map(c => c.text);
+  if (picked.length < n) for (const f of nearMisses(answer)) if (picked.length < n && !picked.some(p => sameText(p, f))) picked.push(f);
+  return picked;
+}
+
+function runMC(deck) {
+  titleEl.textContent = "Flerval";
+  render("tpl-mc", "mc");
+  goBack = deck.back; reopen = deck.back;
+  const queue = buildSession(deck), total = queue.length, pool = mcPool(deck);
+  let right = 0, cur = null, answered = false, done = 0;
+  const sess = practiceSession();
+  const promptCard = view.querySelector(".card.static"), opts = $("#options"), btnNext = $("#btnNext");
+  const refreshTools = practiceTools(() => cur, id => { dropFromQueue(queue, id); next(); });
+  $("#btnSpeakQ").classList.toggle("hidden", !isLanguage());
+  $("#btnSpeakQ").onclick = () => speak(cur.item.es);
+
+  function next() {
+    if (!queue.length) return showDone(deck, `Du hade ${right} av ${total} rätt på första försöket.`, () => runMC(deck), right, total);
+    cur = queue.shift(); answered = false;
+    refreshTools();
+    const { item, showSv } = cur, L = sideLabels();
+    const answerSide = showSv ? "es" : "sv", correct = item[answerSide];
+    $("#promptLang").textContent = (showSv ? L.sv : L.es) + " → " + (showSv ? L.es : L.sv);
+    $("#prompt").textContent = showSv ? item.sv : item.es;
+    $("#prompt").classList.toggle("long", (showSv ? item.sv : item.es).length > 40);
+    $("#progress").textContent = `${total - queue.length} / ${total}`;
+    setPbar(done, total);
+    playClass(promptCard, "deal-in");
+    btnNext.classList.add("hidden");
+    const choices = shuffle([correct, ...pickDistractors(correct, answerSide, pool)]);
+    opts.innerHTML = "";
+    choices.forEach((text, i) => {
+      const b = el("button", "mc-opt");
+      b.append(el("span", "mc-key", String(i + 1)), el("span", "mc-text", text));
+      if (text.length > 40) b.classList.add("long");
+      b.style.setProperty("--i", i);
+      b.onclick = () => choose(b, text === correct);
+      b.dataset.correct = text === correct ? "1" : "";
+      opts.append(b);
+    });
+    if (!showSv) speak(item.es);
+  }
+  async function choose(btn, ok) {
+    if (answered) return;
+    answered = true;
+    opts.querySelectorAll(".mc-opt").forEach(b => { b.disabled = true; if (b.dataset.correct) b.classList.add("right"); });
+    if (ok) {
+      if (!cur.retry) right++;
+      done++;
+      playClass(btn, "pop"); burst(btn);
+      sess.answer(cur.item, true, btn, "mc", cur.retry);
+      speak(cur.item.es);
+      setPbar(done, total);
+      await wait(900);
+      if (alive(opts)) next();
+    } else {
+      btn.classList.add("wrong"); playClass(btn, "shake");
+      sess.answer(cur.item, false, btn, "mc", cur.retry);
+      queue.splice(Math.min(3, queue.length), 0, { ...cur, retry: true });
+      speak(cur.item.es);
+      btnNext.classList.remove("hidden"); btnNext.focus();
+    }
+  }
+  btnNext.onclick = next;
+  document.onkeydown = e => {
+    if (e.target.closest("input, textarea, select")) return;
+    const n = Number(e.key);
+    if (n >= 1 && n <= 4 && !answered) opts.querySelectorAll(".mc-opt")[n - 1]?.click();
+  };
+  next();
+}
+
+// =====================================================================
+//  Memory
+// =====================================================================
+function runMemory(deck) {
+  titleEl.textContent = "Memory";
+  render("tpl-memory", "memory");
+  goBack = deck.back; reopen = deck.back;
+  // Kort som ska repeteras först, sen fylls det på så att det blir 6 par
+  const pairs = buildSession(deck, 6).map(x => x.item);
+  for (const it of shuffle(deck.items)) { if (pairs.length >= 6) break; if (!pairs.includes(it)) pairs.push(it); }
+  const sess = practiceSession(), L = sideLabels();
+  const tiles = shuffle(pairs.flatMap((it, i) => [{ i, side: "sv", text: it.sv }, { i, side: "es", text: it.es }]));
+  const grid = $("#memGrid");
+  let open = [], matched = 0, moves = 0, lock = false;
+  const status = () => { $("#progress").textContent = `Par: ${matched} / ${pairs.length} · Drag: ${moves}`; };
+  status();
+  tiles.forEach((t, idx) => {
+    const b = el("button", "mtile");
+    b.style.setProperty("--i", idx);
+    const inner = el("span", "mtile-inner");
+    const back = el("span", "mt-face mt-back", "Ñ");
+    const front = el("span", "mt-face mt-front");
+    front.append(el("small", "", t.side === "sv" ? L.sv : L.es), el("span", "mt-text" + (t.text.length > 28 ? " long" : ""), t.text));
+    inner.append(back, front); b.append(inner);
+    b.onclick = () => flipTile(b, t);
+    grid.append(b);
+  });
+  async function flipTile(b, t) {
+    if (lock || b.classList.contains("open") || b.classList.contains("matched")) return;
+    b.classList.add("open");
+    open.push({ b, t });
+    if (t.side === "es") speak(t.text);
+    if (open.length < 2) return;
+    moves++; lock = true;
+    const [x, y] = open; open = [];
+    if (x.t.i === y.t.i && x.t.side !== y.t.side) {
+      await wait(350);
+      if (!alive(grid)) return;
+      x.b.classList.add("matched"); y.b.classList.add("matched");
+      playClass(x.b, "pop"); playClass(y.b, "pop");
+      burst(y.b, ["✨", "⭐", "💫"], 8);
+      sess.answer(pairs[x.t.i], true, y.b, "memory", false, true);   // XP, men kortets nivå ändras inte
+      matched++;
+      lock = false; status();
+      if (matched === pairs.length) {
+        announceAch(addTotal("memoryWins"));
+        await wait(700);
+        if (!alive(grid)) return;
+        showDone(deck, `Du hittade alla ${pairs.length} par på ${moves} drag!`, () => runMemory(deck), pairs.length, moves, { countPerfect: false });
+      }
+    } else {
+      sess.breakCombo();
+      await wait(950);
+      if (!alive(grid)) return;
+      playClass(x.b, "shake"); playClass(y.b, "shake");
+      x.b.classList.remove("open"); y.b.classList.remove("open");
+      lock = false; status();
+    }
+  }
+}
+
+// =====================================================================
+//  Lyssna och skriv
+// =====================================================================
+function runListen(deck) {
+  titleEl.textContent = "Lyssna och skriv";
+  render("tpl-listen", "listen");
+  goBack = deck.back; reopen = deck.back;
+  setupAccents(view);
+  const queue = buildSession(deck), total = queue.length, sess = practiceSession();
+  let right = 0, cur = null, answered = false, done = 0;
+  const input = $("#answer"), feedback = $("#feedback"), btnNext = $("#btnNext"), card = view.querySelector(".listen-card");
+  input.lang = cfg().lang;
+  const refreshTools = practiceTools(() => cur, id => { dropFromQueue(queue, id); next(); });
+  const play = (rate = 0.85) => { speak(cur.item.es, rate); playClass($("#btnPlay"), "pop"); };
+  $("#btnPlay").onclick = () => play();
+  $("#btnSlow").onclick = () => play(0.5);
+  $("#btnHint").onclick = () => { $("#hint").textContent = `Betyder: ${cur.item.sv}`; $("#hint").classList.remove("hidden"); };
+
+  function next() {
+    if (!queue.length) return showDone(deck, `Du hade ${right} av ${total} rätt på första försöket.`, () => runListen(deck), right, total);
+    cur = queue.shift(); answered = false;
+    refreshTools();
+    $("#progress").textContent = `${total - queue.length} / ${total}`;
+    setPbar(done, total);
+    $("#hint").classList.add("hidden");
+    input.value = ""; input.disabled = false;
+    feedback.className = "feedback hidden";
+    btnNext.classList.add("hidden");
+    playClass(card, "deal-in");
+    input.focus();
+    setTimeout(() => play(), 250);
+  }
+  $("#writeForm").onsubmit = e => {
+    e.preventDefault();
+    if (answered) return next();
+    answered = true;
+    const result = check(input.value, cur.item.es, "es");
+    input.disabled = true;
+    if (result !== "no") {
+      if (!cur.retry) right++;
+      done++;
+      feedback.className = "feedback " + (result === "ok" ? "ok" : "almost");
+      feedback.textContent = result === "ok" ? `✓ Rätt! ${cur.item.es} = ${cur.item.sv}` : `Nästan! Tänk på accenterna: ${cur.item.es}`;
+      playClass(card, "pop"); burst(card);
+      sess.answer(cur.item, true, card, "listen", cur.retry);
+    } else {
+      feedback.className = "feedback no";
+      feedback.textContent = `Det var: ${cur.item.es} (${cur.item.sv})`;
+      playClass(card, "shake");
+      sess.answer(cur.item, false, card, "listen", cur.retry);
+      queue.splice(Math.min(3, queue.length), 0, { ...cur, retry: true });
+    }
+    setPbar(done, total);
+    playClass(feedback, "pop-in");
+    btnNext.classList.remove("hidden"); btnNext.focus();
+  };
+  btnNext.onclick = next;
+  next();
+}
+
+// =====================================================================
+//  Uttal (taligenkänning)
+// =====================================================================
+function speechMatches(heardList, target) {
+  const art = langInfo().article;
+  const norm = t => stripAccents(normalize(t, "es")).replace(art, "").trim();
+  const targets = target.split("/").map(norm).filter(Boolean);
+  return heardList.some(h => {
+    const H = norm(h);
+    return targets.some(tg => tg === H || (` ${H} `).includes(` ${tg} `) || similarity(tg, H) >= 0.75);
+  });
+}
+function runSpeak(deck) {
+  titleEl.textContent = "Uttal";
+  render("tpl-speak", "speak");
+  goBack = deck.back; reopen = deck.back;
+  const SR = speechRecognitionClass();
+  const queue = buildSession(deck), total = queue.length, sess = practiceSession();
+  let right = 0, cur = null, tries = 0, done = 0, rec = null, finished = false;
+  const card = view.querySelector(".card.static"), mic = $("#btnMic"), status = $("#micStatus"), btnNext = $("#btnNext");
+  const refreshTools = practiceTools(() => cur, id => { dropFromQueue(queue, id); next(); });
+  $("#btnSpeakQ").onclick = () => speak(cur.item.es);
+
+  function next() {
+    rec?.abort?.();
+    if (!queue.length) return showDone(deck, `Du sa ${right} av ${total} rätt.`, () => runSpeak(deck), right, total);
+    cur = queue.shift(); tries = 0; finished = false;
+    refreshTools();
+    $("#prompt").textContent = cur.item.es;
+    $("#promptSv").textContent = cur.item.sv;
+    $("#progress").textContent = `${total - queue.length} / ${total}`;
+    setPbar(done, total);
+    status.textContent = "Tryck på mikrofonen och säg ordet.";
+    status.className = "muted center";
+    mic.disabled = false; mic.classList.remove("listening");
+    btnNext.classList.add("hidden"); $("#btnSkip").classList.remove("hidden");
+    playClass(card, "deal-in");
+  }
+  function finish(ok, heard) {
+    finished = true;
+    mic.disabled = true;
+    if (ok) {
+      if (!cur.retry) right++;
+      done++;
+      status.textContent = `✓ Perfekt! Jag hörde "${heard}"`;
+      status.className = "center feedback ok";
+      playClass(card, "pop"); burst(mic);
+    } else {
+      status.textContent = `Inte riktigt – lyssna på hur det låter och försök nästa gång.`;
+      status.className = "center feedback no";
+      speak(cur.item.es);
+    }
+    sess.answer(cur.item, ok, mic, "speak", cur.retry);
+    setPbar(done, total);
+    btnNext.classList.remove("hidden"); $("#btnSkip").classList.add("hidden");
+    btnNext.focus();
+  }
+  mic.onclick = () => {
+    if (finished || !SR) return;
+    if (rec) { rec.abort(); rec = null; }
+    rec = new SR();
+    rec.lang = langInfo().tts;
+    rec.interimResults = false;
+    rec.maxAlternatives = 5;
+    mic.classList.add("listening");
+    status.textContent = "🎙 Lyssnar… säg ordet nu";
+    status.className = "center";
+    rec.onresult = e => {
+      const heard = [...e.results[0]].map(a => a.transcript);
+      mic.classList.remove("listening");
+      if (speechMatches(heard, cur.item.es)) finish(true, heard[0]);
+      else {
+        tries++;
+        if (tries >= 3) finish(false, heard[0]);
+        else {
+          status.textContent = `Jag hörde "${heard[0]}". Försök igen (${3 - tries} försök kvar).`;
+          status.className = "center feedback almost";
+          playClass(card, "shake");
+        }
+      }
+    };
+    rec.onerror = e => {
+      mic.classList.remove("listening");
+      status.className = "center feedback no";
+      status.textContent = e.error === "not-allowed" || e.error === "service-not-allowed"
+        ? "Mikrofonen är blockerad. Tillåt mikrofonen för sidan i webbläsaren och försök igen."
+        : e.error === "no-speech" ? "Jag hörde inget – tryck och försök igen."
+        : e.error === "network" ? "Taligenkänningen behöver internet. Försök igen när du är online."
+        : "Något gick fel med mikrofonen (" + e.error + "). Försök igen.";
+    };
+    rec.onend = () => mic.classList.remove("listening");
+    try { rec.start(); } catch { /* redan igång */ }
+  };
+  $("#btnSkip").onclick = () => { if (!finished) finish(false, ""); };
+  btnNext.onclick = next;
+  next();
+}
+
+// =====================================================================
+//  Verbböjning (spanska)
+// =====================================================================
+function runVerbsStart(deck) {
+  titleEl.textContent = "Verbböjning";
+  render("tpl-verbs-start", "verbs-start");
+  goBack = deck.back; reopen = deck.back;
+  let chosen = load("app.verbTenses", ["pres", "pret"]);
+  const chips = $("#tenseChips");
+  for (const [id, t] of Object.entries(VERB_TENSES)) {
+    const c = el("button", "chip" + (chosen.includes(id) ? " active" : ""), t.name);
+    c.title = t.sv;
+    c.onclick = () => {
+      chosen = chosen.includes(id) ? chosen.filter(x => x !== id) : [...chosen, id];
+      if (!chosen.length) chosen = [id];
+      chips.querySelectorAll(".chip").forEach((b, i) => b.classList.toggle("active", chosen.includes(Object.keys(VERB_TENSES)[i])));
+      playClass(c, "pop");
+      save("app.verbTenses", chosen);
+    };
+    chips.append(c);
+  }
+  $("#btnStartVerbs").onclick = () => runVerbs(deck, chosen);
+}
+function runVerbs(deck, tenses) {
+  render("tpl-verbs", "verbs");
+  goBack = deck.back; reopen = deck.back;
+  setupAccents(view);
+  stats.vbox = stats.vbox || {};
+  const vbox = k => stats.vbox[k] || 0;
+  // 10 frågor: verb, tid och person – de former du kan sämst kommer oftare
+  const all = [];
+  for (const [inf, sv] of VERBS) for (const t of tenses) for (let p = 0; p < 6; p++) all.push({ inf, sv, tense: t, p, key: `v:${inf}:${t}:${p}` });
+  const picked = [], usedVerbs = new Set();
+  for (const q of shuffle(all).sort((a, b) => vbox(a.key) - vbox(b.key))) {
+    if (picked.length >= 10) break;
+    if (usedVerbs.has(q.inf)) continue;
+    usedVerbs.add(q.inf); picked.push(q);
+  }
+  const queue = picked.map(q => ({
+    q, retry: false,
+    item: {
+      record: (ok, opt = {}) => {
+        stats.vbox[q.key] = ok ? clampBox(vbox(q.key) + 1) : 0;
+        return awardPractice(q.key, ok, stats.vbox[q.key], { ...opt, isCard: false, noBox: true, mode: "verbs" });
+      }
+    }
+  }));
+  const total = queue.length, sess = practiceSession();
+  let right = 0, cur = null, answered = false, done = 0;
+  const input = $("#answer"), feedback = $("#feedback"), btnNext = $("#btnNext"), card = view.querySelector(".card.static");
+
+  function next() {
+    if (!queue.length) return showDone(deck, `Du böjde ${right} av ${total} verb rätt.`, () => runVerbs(deck, tenses), right, total);
+    cur = queue.shift(); answered = false;
+    const { q } = cur;
+    $("#verbTense").textContent = VERB_TENSES[q.tense].name;
+    $("#verbInf").textContent = q.inf;
+    $("#verbSv").textContent = q.sv;
+    $("#verbPerson").textContent = "";
+    $("#verbPerson").append(el("b", "", VERB_PERSONS[q.p].es), el("small", "", ` (${VERB_PERSONS[q.p].sv})`));
+    $("#progress").textContent = `${total - queue.length} / ${total}`;
+    setPbar(done, total);
+    input.value = ""; input.disabled = false;
+    feedback.className = "feedback hidden";
+    $("#verbTable").classList.add("hidden");
+    btnNext.classList.add("hidden");
+    playClass(card, "deal-in");
+    input.focus();
+  }
+  function showTable(q) {
+    const tb = $("#verbTable");
+    tb.innerHTML = "";
+    tb.append(el("div", "vt-title", `${q.inf} – ${VERB_TENSES[q.tense].name.toLowerCase()}`));
+    VERB_PERSONS.forEach((p, i) => {
+      const row = el("div", "vt-row" + (i === q.p ? " hl" : ""));
+      row.append(el("span", "", p.es), el("b", "", conjugate(q.inf, q.tense, i)));
+      tb.append(row);
+    });
+    tb.classList.remove("hidden");
+    playClass(tb, "pop-in");
+  }
+  $("#writeForm").onsubmit = e => {
+    e.preventDefault();
+    if (answered) return next();
+    answered = true;
+    const { q } = cur, correct = conjugate(q.inf, q.tense, q.p);
+    const given = input.value.trim().toLowerCase();
+    input.disabled = true;
+    if (given === correct) {
+      if (!cur.retry) right++;
+      done++;
+      feedback.className = "feedback ok";
+      feedback.textContent = `✓ Rätt! ${VERB_PERSONS[q.p].es.split(" / ")[0]} ${correct}`;
+      playClass(card, "pop"); burst(card);
+      sess.answer(cur.item, true, card, "verbs", cur.retry);
+    } else {
+      const almost = stripAccents(given) === stripAccents(correct);
+      feedback.className = "feedback " + (almost ? "almost" : "no");
+      feedback.textContent = almost ? `Nästan! Accenten gör skillnad: ${correct}` : `Rätt svar: ${correct}`;
+      playClass(card, "shake");
+      sess.answer(cur.item, false, card, "verbs", cur.retry);
+      queue.splice(Math.min(3, queue.length), 0, { ...cur, retry: true });
+    }
+    speak(correct);
+    setPbar(done, total);
+    showTable(q);
+    playClass(feedback, "pop-in");
+    btnNext.classList.remove("hidden"); btnNext.focus();
+  };
+  btnNext.onclick = next;
+  next();
+}
+
+// =====================================================================
+//  Märken & statistik, med XP-kursen
+// =====================================================================
+const SV_MONTHS = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+const SV_DAYS = ["sön", "mån", "tis", "ons", "tors", "fre", "lör"];
+function dateLabel(d, withDay = false) { return (withDay ? SV_DAYS[d.getDay()] + " " : "") + d.getDate() + " " + SV_MONTHS[d.getMonth()]; }
+
+function xpSeries(range) {
+  const days = getDays(), keys = Object.keys(days).sort();
+  let n = range === "all" ? 7 : Number(range);
+  if (range === "all" && keys.length) {
+    const first = new Date(keys[0] + "T12:00:00");
+    n = Math.max(7, Math.round((Date.now() - first) / 86400000) + 1);
+  }
+  const out = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - i);
+    const v = days[todayKey(d)] || {};
+    out.push({ date: d, xp: v.xp || 0, n: v.n || 0 });
+  }
+  return out;
+}
+
+function showAch() {
+  titleEl.textContent = "Märken";
+  goBack = showHome; reopen = showAch;
+  render("tpl-ach", "ach");
+  let range = load("app.chartRange", "30");
+  const chips = view.querySelectorAll(".tk-ranges .chip");
+  chips.forEach(c => {
+    c.classList.toggle("active", c.dataset.range === String(range));
+    c.onclick = () => {
+      range = c.dataset.range; save("app.chartRange", range);
+      chips.forEach(x => x.classList.toggle("active", x === c));
+      drawTicker(range);
+    };
+  });
+  drawTicker(range);
+
+  // Siffror
+  const t = getTotals(), st = $("#achStats");
+  const tiles = [
+    ["🔥", currentStreak(), "dagar i rad nu"], ["🏆", Math.max(t.bestStreak, currentStreak()), "bästa streak"],
+    ["📚", t.answers, "svar totalt"], ["✅", t.answers ? Math.round(100 * t.correct / t.answers) + " %" : "–", "rätt"],
+    ["⚡", t.maxCombo, "bästa combo"], ["💯", t.perfect, "felfria rundor"]
+  ];
+  for (const [icon, val, label] of tiles) {
+    const d = el("div", "ach-stat");
+    d.append(el("span", "", icon), el("b", "", String(val)), el("small", "", label));
+    st.append(d);
+  }
+
+  // Märken: upplåsta först
+  const un = unlockedAch(), grid = $("#achGrid");
+  $("#achCount").textContent = `${Object.keys(un).length} / ${ACHIEVEMENTS.length}`;
+  const sorted = [...ACHIEVEMENTS].sort((a, b) => (un[b.id] ? 1 : 0) - (un[a.id] ? 1 : 0));
+  sorted.forEach((a, i) => {
+    const got = !!un[a.id];
+    const d = el("div", "badge" + (got ? " got" : ""));
+    d.style.setProperty("--i", i);
+    d.append(el("span", "badge-icon", a.icon), el("b", "", a.name), el("small", "", a.desc));
+    if (got) d.append(el("small", "badge-date", "✓ " + dateLabel(new Date(un[a.id]))));
+    else {
+      const v = Math.min(a.val(t), a.goal);
+      const bar = el("div", "bar"), fill = el("i"); fill.style.width = Math.round(100 * v / a.goal) + "%"; bar.append(fill);
+      d.append(bar, el("small", "badge-prog", `${v} / ${a.goal}`));
+    }
+    grid.append(d);
+  });
+}
+
+// Aktie-liknande diagram över XP per dag
+function drawTicker(range) {
+  const data = xpSeries(range), box = $("#tkChart");
+  const today = data[data.length - 1].xp, yest = data.length > 1 ? data[data.length - 2].xp : 0;
+  $("#tkVal").textContent = today;
+  const diff = today - yest, ch = $("#tkChange");
+  ch.className = "tk-change " + (diff > 0 ? "up" : diff < 0 ? "down" : "flat");
+  ch.textContent = (diff > 0 ? "▲ +" : diff < 0 ? "▼ " : "■ ") + diff + " XP" +
+    (yest ? ` (${diff >= 0 ? "+" : ""}${Math.round(100 * diff / yest)} %)` : "") + " mot igår";
+
+  // Tabell (samma siffror utan diagram)
+  const table = $("#tkTable");
+  table.innerHTML = "<thead><tr><th>Dag</th><th>XP</th><th>Kort</th></tr></thead>";
+  const tb = el("tbody");
+  for (const p of [...data].reverse()) {
+    const tr = el("tr");
+    tr.append(el("td", "", dateLabel(p.date, true)), el("td", "", String(p.xp)), el("td", "", String(p.n)));
+    tb.append(tr);
+  }
+  table.append(tb);
+
+  // SVG
+  const W = Math.max(280, box.clientWidth || 340), H = 190, pl = 34, pr = 10, pt = 12, pb = 24;
+  const max = Math.max(10, ...data.map(p => p.xp));
+  const step = Math.pow(10, Math.floor(Math.log10(max)));
+  const top = Math.ceil(max / step) * step;
+  const x = i => pl + (data.length === 1 ? (W - pl - pr) / 2 : i * (W - pl - pr) / (data.length - 1));
+  const y = v => pt + (H - pt - pb) * (1 - v / top);
+  const up = data[data.length - 1].xp >= data[0].xp;
+  const color = up ? "var(--good)" : "var(--bad)";
+  const ns = "http://www.w3.org/2000/svg";
+  const mk = (tag, attrs) => { const e = document.createElementNS(ns, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+  const svg = mk("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: "img",
+    "aria-label": `XP per dag, senaste ${data.length} dagarna. Idag ${today} XP.` });
+  const defs = mk("defs", {}), grad = mk("linearGradient", { id: "tkGrad", x1: 0, y1: 0, x2: 0, y2: 1 });
+  grad.append(mk("stop", { offset: "0%", "stop-color": up ? "#27ae60" : "#c0392b", "stop-opacity": 0.28 }),
+              mk("stop", { offset: "100%", "stop-color": up ? "#27ae60" : "#c0392b", "stop-opacity": 0 }));
+  defs.append(grad); svg.append(defs);
+  // rutnät och y-etiketter
+  for (const v of [0, top / 2, top]) {
+    svg.append(mk("line", { x1: pl, x2: W - pr, y1: y(v), y2: y(v), class: "tk-grid" }));
+    const lab = mk("text", { x: pl - 6, y: y(v) + 4, class: "tk-axis", "text-anchor": "end" }); lab.textContent = Math.round(v); svg.append(lab);
+  }
+  // x-etiketter: första, mitten, sista
+  const idxs = [...new Set([0, Math.floor((data.length - 1) / 2), data.length - 1])];
+  for (const i of idxs) {
+    const lab = mk("text", { x: x(i), y: H - 6, class: "tk-axis", "text-anchor": i === 0 ? "start" : i === data.length - 1 ? "end" : "middle" });
+    lab.textContent = i === data.length - 1 ? "idag" : dateLabel(data[i].date); svg.append(lab);
+  }
+  const pts = data.map((p, i) => `${x(i).toFixed(1)},${y(p.xp).toFixed(1)}`);
+  svg.append(mk("path", { d: `M${x(0)},${y(0)} L${pts.join(" L")} L${x(data.length - 1)},${y(0)} Z`, fill: "url(#tkGrad)" }));
+  const line = mk("polyline", { points: pts.join(" "), fill: "none", stroke: color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round", class: "tk-line" });
+  svg.append(line);
+  svg.append(mk("circle", { cx: x(data.length - 1), cy: y(today), r: 4.5, fill: color, stroke: "var(--card)", "stroke-width": 2 }));
+  // hovring: hårkors och etikett
+  const cross = mk("line", { y1: pt, y2: H - pb, class: "tk-cross", visibility: "hidden" });
+  const dot = mk("circle", { r: 5, fill: color, stroke: "var(--card)", "stroke-width": 2, visibility: "hidden" });
+  svg.append(cross, dot);
+  box.innerHTML = ""; box.append(svg);
+  const tip = el("div", "tk-tip hidden"); box.append(tip);
+  const hit = mk("rect", { x: pl, y: 0, width: W - pl - pr, height: H, fill: "transparent", tabindex: 0 });
+  svg.append(hit);
+  let cur = data.length - 1;
+  const showAt = i => {
+    cur = Math.max(0, Math.min(data.length - 1, i));
+    const p = data[cur];
+    cross.setAttribute("x1", x(cur)); cross.setAttribute("x2", x(cur)); cross.setAttribute("visibility", "visible");
+    dot.setAttribute("cx", x(cur)); dot.setAttribute("cy", y(p.xp)); dot.setAttribute("visibility", "visible");
+    tip.textContent = "";
+    tip.append(el("b", "", `${p.xp} XP`), el("small", "", `${dateLabel(p.date, true)} · ${p.n} kort`));
+    tip.classList.remove("hidden");
+    const r = svg.getBoundingClientRect(), sx = r.width / W;
+    tip.style.left = Math.min(Math.max(x(cur) * sx, 50), r.width - 50) + "px";
+    tip.style.top = Math.max(0, y(p.xp) * sx - 48) + "px";
+  };
+  const hide = () => { cross.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); tip.classList.add("hidden"); };
+  hit.addEventListener("pointermove", e => {
+    const r = svg.getBoundingClientRect(), px = (e.clientX - r.left) * (W / r.width);
+    showAt(Math.round((px - pl) / ((W - pl - pr) / Math.max(1, data.length - 1))));
+  });
+  hit.addEventListener("pointerleave", hide);
+  hit.addEventListener("focus", () => showAt(cur));
+  hit.addEventListener("blur", hide);
+  hit.addEventListener("keydown", e => {
+    if (e.key === "ArrowLeft") { e.preventDefault(); showAt(cur - 1); }
+    if (e.key === "ArrowRight") { e.preventDefault(); showAt(cur + 1); }
+  });
+  // linjen ritas fram
+  if (animOn() && line.getTotalLength) {
+    const L = line.getTotalLength();
+    line.style.strokeDasharray = L; line.style.strokeDashoffset = L;
+    line.getBoundingClientRect();
+    line.style.transition = "stroke-dashoffset 1s ease-out"; line.style.strokeDashoffset = 0;
+  }
 }
 
 // =====================================================================
@@ -1565,6 +2430,16 @@ function showSettings() {
   const dark = $("#darkToggle");
   dark.checked = currentTheme() === "dark";
   dark.onchange = () => setTheme(dark.checked ? "dark" : "light");
+  const goalIn = $("#goalInput");
+  goalIn.value = getGoal();
+  goalIn.onchange = () => {
+    const num = Math.round(Number(goalIn.value));
+    if (!num || num < 1 || num > 500) { goalIn.value = getGoal(); toast("Skriv ett tal mellan 1 och 500"); return; }
+    save("app.goal", num); toast(`🎯 Nytt dagsmål: ${num} kort`);
+  };
+  const sr = $("#srToggle");
+  sr.checked = srOn();
+  sr.onchange = () => { save("app.sr", sr.checked ? "on" : "off"); toast(sr.checked ? "📅 Smart repetition på" : "Smart repetition av"); };
   const anim = $("#animToggle");
   anim.checked = animOn();
   anim.onchange = () => {
