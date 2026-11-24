@@ -51,6 +51,25 @@
   <!-- Startsida -->
   <template id="tpl-home">
     <section class="home">
+      <div class="stats-panel">
+        <div class="level-row">
+          <span id="lvlBadge" class="level-badge" title="Din nivå">1</span>
+          <div class="xp-wrap">
+            <div class="xp-text"><b id="lvlName">Nivå 1</b><span id="xpText" class="muted"></span></div>
+            <div class="xp-bar"><i id="xpBar"></i></div>
+            <small id="xpNext" class="muted"></small>
+          </div>
+        </div>
+        <div class="counters">
+          <div class="counter" title="Kort du har övat på minst en gång">
+            <span class="c-icon">📚</span><b id="cntStudied">0</b><small>kort övade</small>
+          </div>
+          <div class="counter gold" title="Kort som nått högsta nivån (5 rätt i rad)">
+            <span class="c-icon">🏆</span><b id="cntMastered">0</b><small>fullt inlärda</small>
+          </div>
+        </div>
+        <small id="statsScope" class="muted stats-scope"></small>
+      </div>
       <button id="btnMyCards" class="deck-btn mine">
         <b>📒 Mina kort</b>
         <span id="myCardsInfo" class="muted"></span>

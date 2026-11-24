@@ -15,6 +15,9 @@ gör en commit och pushar till GitHub. Versionen syns uppe i appens titelrad.
 Stäng och öppna appen på enheterna för att få den nya versionen.
 
 ## Funktioner
+- **XP och nivåer** (överst på startsidan): +3 XP för rätt svar, +1 XP för fel (du övade ändå), +50 XP första
+  gången ett kort blir fullt inlärt (5 rätt i rad). Nivå 2 vid 100 XP, 3 vid 300, 4 vid 600 … XP gäller alla konfigar.
+  Räknarna **kort övade** och **fullt inlärda** gäller aktiv konfig.
 - **☰ Konfigar** (bredvid hemknappen): varje konfig är ett språk (spanska, engelska, tyska, franska,
   italienska, portugisiska) eller ett ämne (t.ex. Företagsekonomi: begrepp ↔ förklaring) med egna kort,
   egen progress och egna inställningar. "＋ Skapa ny konfig" och ✏️ för att ändra eller ta bort.

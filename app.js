@@ -160,6 +160,69 @@ function fillCatSelect(sel, { withAll = false, value = null } = {}) {
   sel.value = value ?? (withAll ? "all" : "none");
 }
 loadConfigData();
+
+// =====================================================================
+//  XP, nivåer och räknare
+// =====================================================================
+// XP är gemensamt för alla konfigar. Räknarna (övade / fullt inlärda) gäller aktiv konfig.
+const XP_RIGHT = 3;     // rätt svar
+const XP_WRONG = 1;     // du övade, även om det blev fel
+const XP_MASTER = 50;   // första gången ett kort blir fullt inlärt (högsta nivån)
+let stats = { studied: {}, mastered: {} };
+
+function getXP() { return Number(load("app.xp", 0)) || 0; }
+// Total XP som behövs för att nå en nivå: 2 → 100, 3 → 300, 4 → 600, 5 → 1000 …
+function xpForLevel(n) { return 50 * (n - 1) * n; }
+function levelFromXP(xp) { let n = 1; while (xp >= xpForLevel(n + 1)) n++; return n; }
+function addXP(amount) {
+  const before = getXP(), after = before + amount;
+  save("app.xp", after);
+  return levelFromXP(after) > levelFromXP(before) ? levelFromXP(after) : 0;   // ny nivå, eller 0
+}
+
+// Första gången i en konfig: räkna fram räknare och XP från det du redan har övat
+function backfillStats() {
+  const st = { studied: {}, mastered: {} };
+  let xp = 0;
+  for (const c of cards) {
+    const k = "c:" + c.id;
+    if (c.seen > 0) st.studied[k] = 1;
+    if (c.box >= MAX_BOX) st.mastered[k] = 1;
+    xp += (c.right || 0) * XP_RIGHT + (c.wrong || 0) * XP_WRONG;
+  }
+  for (const [deckId, words] of Object.entries(progress)) {
+    if (deckId === "mina") continue;
+    for (const [es, box] of Object.entries(words || {})) {
+      const k = `d:${deckId}:${es}`;
+      if (box > 0) { st.studied[k] = 1; xp += box * XP_RIGHT; }
+      if (box >= MAX_BOX) st.mastered[k] = 1;
+    }
+  }
+  xp += Object.keys(st.mastered).length * XP_MASTER;
+  if (xp) addXP(xp);
+  return st;
+}
+function loadStats() {
+  stats = load(lsKey("stats"), null);
+  if (!stats || typeof stats !== "object") { stats = backfillStats(); save(lsKey("stats"), stats); }
+  stats.studied = stats.studied || {}; stats.mastered = stats.mastered || {};
+}
+loadStats();
+
+function studiedCount() { return Object.keys(stats.studied).length; }
+function masteredCount() { return Object.keys(stats.mastered).length; }
+
+// Anropas varje gång ett kort besvaras i en övning. Returnerar vad som hände.
+function awardPractice(key, ok, box) {
+  let gained = ok ? XP_RIGHT : XP_WRONG, mastered = false;
+  stats.studied[key] = 1;
+  if (ok && box >= MAX_BOX && !stats.mastered[key]) {
+    stats.mastered[key] = 1; gained += XP_MASTER; mastered = true;
+  }
+  save(lsKey("stats"), stats);
+  const levelUp = addXP(gained);
+  return { gained, mastered, levelUp };
+}
 function saveCards() { save(lsKey("cards"), cards); }
 function cardById(id) { return cards.find(c => c.id === id); }
 
@@ -473,6 +536,36 @@ function setPbar(done, total) {
   if (f) f.style.width = (total ? Math.round(100 * done / total) : 0) + "%";
 }
 
+// Flytande text, t.ex. "+3 XP", som stiger uppåt från ett element
+function floatText(text, from, cls = "") {
+  if (!from) return;
+  const r = from.getBoundingClientRect();
+  const f = el("span", "float-xp " + cls, text);
+  f.style.left = (r.left + r.width / 2) + "px"; f.style.top = (r.top) + "px";
+  document.body.append(f);
+  if (!animOn()) { setTimeout(() => f.remove(), 900); return; }
+  f.animate([
+    { transform: "translate(-50%, 0) scale(.7)", opacity: 0 },
+    { transform: "translate(-50%, -22px) scale(1.1)", opacity: 1, offset: 0.25 },
+    { transform: "translate(-50%, -70px) scale(1)", opacity: 0 }
+  ], { duration: 1100, easing: "ease-out" }).onfinish = () => f.remove();
+}
+// Visar XP-belöningen efter ett svar: +XP, firande vid fullt inlärt kort och ny nivå
+function showXP(res, from) {
+  if (!res) return;
+  floatText(`+${res.gained} XP`, from, res.mastered ? "big" : "");
+  if (res.mastered) {
+    toast(`🏆 Fullt inlärt! +${XP_MASTER} XP`);
+    burst(from, ["🏆", "⭐", "✨", "💎", "🎉"], 16);
+  }
+  if (res.levelUp) {
+    setTimeout(() => {
+      toast(`⭐ Ny nivå: ${res.levelUp}!`);
+      burst({ x: innerWidth / 2, y: innerHeight / 3 }, ["⭐", "🌟", "✨", "🎊", "🎉"], 22);
+    }, res.mastered ? 1400 : 300);
+  }
+}
+
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
@@ -512,6 +605,7 @@ function showHome() {
     : (isLanguage() ? "Inga kort än – tryck här och lägg till dina egna ord" : "Inga kort än – tryck här och lägg till begrepp");
   $("#myCardsBar").dataset.w = total ? `${Math.round(100 * cards.reduce((s, c) => s + c.box, 0) / (total * MAX_BOX))}%` : "0%";
   $("#btnMyCards").onclick = showMyCards;
+  renderStatsPanel();
 
   const list = $("#deckList");
   if (!hasBuiltinDecks()) { $(".lead").classList.add("hidden"); list.classList.add("hidden"); }
@@ -540,11 +634,40 @@ function showHome() {
   requestAnimationFrame(() => requestAnimationFrame(() => view.querySelectorAll(".bar > i").forEach(i => { i.style.width = i.dataset.w; })));
   $("#btnUpdate").onclick = forceUpdate;
   $("#btnReset").onclick = () => {
-    if (!confirm("Vill du nollställa all progress? (Dina kort finns kvar, bara statistiken nollas.)")) return;
+    if (!confirm("Vill du nollställa all progress? Dina kort finns kvar, men nivåerna och räknarna (övade / fullt inlärda) nollas. Din XP och nivå finns kvar.")) return;
     progress = {}; save(lsKey("progress"), progress);
+    stats = { studied: {}, mastered: {} }; save(lsKey("stats"), stats);
     cards.forEach(c => { c.box = 0; c.seen = 0; c.right = 0; c.wrong = 0; c.lastSeen = 0; });
     saveCards(); showHome();
   };
+}
+
+// Panelen överst på startsidan: nivå, XP och räknare
+function countUp(elem, to) {
+  if (!animOn() || to === 0) { elem.textContent = to; return; }
+  const start = performance.now(), dur = Math.min(1200, 400 + to * 15);
+  const step = now => {
+    const t = Math.min(1, (now - start) / dur), eased = 1 - Math.pow(1 - t, 3);
+    elem.textContent = Math.round(to * eased);
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function renderStatsPanel() {
+  const xp = getXP(), lvl = levelFromXP(xp);
+  const lo = xpForLevel(lvl), hi = xpForLevel(lvl + 1);
+  $("#lvlBadge").textContent = lvl;
+  $("#lvlName").textContent = `Nivå ${lvl}`;
+  $("#xpText").textContent = `${xp} XP`;
+  $("#xpNext").textContent = `${hi - xp} XP kvar till nivå ${lvl + 1}`;
+  const bar = $("#xpBar");
+  bar.dataset.w = Math.round(100 * (xp - lo) / (hi - lo)) + "%";
+  bar.style.width = "0%";
+  requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.width = bar.dataset.w; }));
+  countUp($("#cntStudied"), studiedCount());
+  countUp($("#cntMastered"), masteredCount());
+  $("#statsScope").textContent = `Räknarna gäller ${cfg().icon || ""} ${cfg().name}. XP och nivå gäller alla konfigar.`;
+  playClass($("#lvlBadge"), "pop");
 }
 
 // =====================================================================
@@ -839,6 +962,7 @@ function myCardsDeck(list) {
         c.seen++; c.lastSeen = Date.now();
         if (ok) { c.right++; c.box = clampBox(c.box + 1); } else { c.wrong++; c.box = 0; }
         saveCards();
+        return awardPractice("c:" + c.id, ok, c.box);
       }
     }))
   };
@@ -858,7 +982,10 @@ function builtinDeck(deck) {
       yellowText: on => on ? "🟡 Kopierad till Mina kort som gult kort" : "Gulmarkeringen borttagen i Mina kort",
       remove: () => hideWord(deck.id, es),
       box: () => getBox(deck.id, es),
-      record: ok => setBox(deck.id, es, ok ? getBox(deck.id, es) + 1 : 0)
+      record: ok => {
+        setBox(deck.id, es, ok ? getBox(deck.id, es) + 1 : 0);
+        return awardPractice(`d:${deck.id}:${es}`, ok, getBox(deck.id, es));
+      }
     }))
   };
 }
@@ -1332,7 +1459,7 @@ function runCards(deck) {
   async function answer(ok, btn) {
     if (busy || !revealed) return;
     busy = true;
-    if (!cur.retry) { if (ok) right++; cur.item.record(ok); }
+    if (!cur.retry) { if (ok) right++; showXP(cur.item.record(ok), btn); }
     if (ok) { done++; burst(btn); }
     else queue.splice(Math.min(3, queue.length), 0, { ...cur, retry: true });   // kommer tillbaka snart
     setPbar(done, total);
@@ -1396,14 +1523,14 @@ function runWrite(deck) {
     const result = check(input.value, correct, showSv ? "es" : "sv");
     input.disabled = true;
     if (result !== "no") {
-      if (!cur.retry) { right++; item.record(true); }
+      if (!cur.retry) { right++; showXP(item.record(true), promptCard); }
       feedback.className = "feedback " + (result === "ok" ? "ok" : "almost");
       feedback.textContent = result === "ok" ? `✓ Rätt! ${correct}` : `Nästan! Tänk på accenterna: ${correct}`;
       done++;
       playClass(promptCard, "pop");
       burst(promptCard, result === "ok" ? ["✨", "⭐", "🎉", "💫"] : ["⭐", "✨"], result === "ok" ? 12 : 6);
     } else {
-      if (!cur.retry) item.record(false);
+      if (!cur.retry) showXP(item.record(false), promptCard);
       queue.splice(Math.min(3, queue.length), 0, { ...cur, retry: true });
       feedback.className = "feedback no";
       feedback.textContent = `Rätt svar: ${correct}`;
@@ -1508,6 +1635,7 @@ function switchConfig(id) {
   if (id === activeId) { showHome(); return; }
   activeId = id; save("app.active", id);
   loadConfigData();
+  loadStats();
   applyConfigUI();
   showHome();
   processQueue();
@@ -1579,7 +1707,7 @@ function showConfigEdit(id) {
     if (!existing || configs.length < 2) return;
     const n = (load(keyFor(existing.id, "cards"), []) || []).length;
     if (!confirm(`Ta bort konfigen "${existing.name}" och alla dess ${n} kort? Det går inte att ångra.`)) return;
-    for (const base of ["cards", "progress", "hidden", "filter", "sort", "dir", "importDraft", "cats", "listCat"]) {
+    for (const base of ["cards", "progress", "hidden", "filter", "sort", "dir", "importDraft", "cats", "listCat", "stats"]) {
       try { localStorage.removeItem(keyFor(existing.id, base)); } catch { /* ignorera */ }
     }
     configs = configs.filter(c => c.id !== existing.id); saveConfigs();
