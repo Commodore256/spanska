@@ -495,29 +495,41 @@ async function processCard(card, c = cfg()) {
   }
 }
 
-let queueRunning = false;
+let queueRunning = false, queueAgain = false, queueRetry = null;
+// Skickar kort som väntar till AI:n, ett i taget. Läggs fler kort till under tiden körs kön igen.
 async function processQueue() {
-  if (queueRunning || !navigator.onLine) return;
-  queueRunning = true;
-  // Kön hör till konfigen som var aktiv när den startade, även om du byter under tiden
-  const id = activeId, c = cfg(), key = lsKey("cards"), list = cards;
+  if (!navigator.onLine) return;
+  if (queueRunning) { queueAgain = true; return; }
+  queueRunning = true; queueAgain = false;
+  const id = activeId, c = cfg(), key = lsKey("cards");
+  let failed = false;
+  // Med AI kontrolleras även kort som tidigare inte kunde kontrolleras
+  // (men aldrig samma kort två gånger med AI, och aldrig kort du själv godkänt eller gulmarkerat)
+  const isTodo = x => x.check?.status === "pending" ||
+    (aiEnabled() && !x.check?.byAi && !x.check?.manual && ["unchecked", "warn"].includes(x.check?.status));
   try {
-    // Med AI kontrolleras även kort som tidigare inte kunde kontrolleras
-    // (men aldrig samma kort två gånger med AI, och aldrig kort du själv godkänt eller gulmarkerat)
-    const todo = () => list.find(x => x.check?.status === "pending" ||
-      (aiEnabled() && !x.check?.byAi && !x.check?.manual && ["unchecked", "warn"].includes(x.check?.status)));
     let card;
-    while ((card = todo())) {
-      card.check = { ...card.check, status: "pending" };
-      try { await processCard(card, c); }
-      catch (e) { console.warn("AI-kontroll misslyckades:", e); break; }
-      finally { save(key, list); }
+    // Läs alltid den aktuella listan – synken kan ha läst in korten på nytt under tiden
+    while (activeId === id && (card = cards.find(isTodo))) {
+      const before = { sv: card.sv, es: card.es };
+      const work = { ...card, check: { ...card.check, status: "pending" } };
+      try { await processCard(work, c); }
+      catch (e) { console.warn("AI-kontroll misslyckades:", e); failed = true; break; }
+      const result = { sv: work.sv, es: work.es, filled: work.filled, filledBy: work.filledBy, check: work.check };
+      // Lägg in svaret på kortet som visas nu (om du inte hann ändra det under tiden)
+      const list = activeId === id ? cards : (load(key, []) || []);
+      const target = list.find(x => x.id === work.id);
+      if (target && target.sv === before.sv && target.es === before.es) {
+        Object.assign(target, result);
+        if (activeId === id) saveCards(); else save(key, list);
+      }
       if (activeId === id) refreshCardViews();
     }
   } finally {
     queueRunning = false;
     if (activeId === id) refreshCardViews();
-    else processQueue();      // fortsätt med den konfig som är aktiv nu
+    if (queueAgain || activeId !== id) setTimeout(processQueue, 0);
+    else if (failed) { clearTimeout(queueRetry); queueRetry = setTimeout(processQueue, 20000); }   // försök igen om en stund
   }
 }
 window.addEventListener("online", processQueue);
