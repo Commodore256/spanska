@@ -564,6 +564,8 @@ let currentView = "home";
 function render(tplId, name) {
   window.speechSynthesis?.cancel();
   document.onkeydown = null;
+  view.onclick = null;
+  document.body.classList.remove("adv-lesson");   // lektionsläget döljer toppraden
   view.innerHTML = "";
   view.appendChild(document.getElementById(tplId).content.cloneNode(true));
   view.scrollTop = 0;
@@ -713,6 +715,7 @@ function showHome() {
     : (isLanguage() ? "Inga kort än – tryck här och lägg till dina egna ord" : "Inga kort än – tryck här och lägg till begrepp");
   $("#myCardsBar").dataset.w = total ? `${Math.round(100 * cards.reduce((s, c) => s + c.box, 0) / (total * MAX_BOX))}%` : "0%";
   $("#btnMyCards").onclick = showMyCards;
+  $("#btnAdventure").onclick = () => showAdventure({ back: showHome });
   renderStatsPanel();
 
   const list = $("#deckList");
@@ -1759,6 +1762,7 @@ function showPracticeMenu(deck) {
   const grid = $("#pmGrid");
   // När en övning är klar kommer du tillbaka hit
   const sub = { ...deck, back: () => showPracticeMenu(deck) };
+  $("#pmAdventure").onclick = () => showAdventure({ back: () => showPracticeMenu(deck) });
   MODES.forEach((m, i) => {
     if (m.lang && !isLanguage()) return;
     if (m.es && !(isLanguage() && cfg().lang === "es")) return;

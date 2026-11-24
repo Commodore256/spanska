@@ -81,6 +81,16 @@
         </div>
         <small id="statsScope" class="muted stats-scope"></small>
       </div>
+      <button id="btnAdventure" class="pm-adventure home">
+        <span class="adv-icon-wrap"><svg class="adv-icon" viewBox="0 0 64 64" aria-hidden="true">
+            <path d="M12 50 L27 33 L40 42 L53 14" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1 7"/>
+            <circle cx="12" cy="50" r="7.5" fill="#2fb344" stroke="#fff" stroke-width="2.5"/>
+            <circle cx="27" cy="33" r="7.5" fill="#1c9be6" stroke="#fff" stroke-width="2.5"/>
+            <circle cx="40" cy="42" r="7.5" fill="#f1c40f" stroke="#fff" stroke-width="2.5"/>
+            <circle cx="53" cy="14" r="7.5" fill="#e0479e" stroke="#fff" stroke-width="2.5"/></svg></span>
+        <span class="pm-adv-text"><b>Äventyr</b><small>Fortsätt där du var</small></span>
+        <span class="pm-adv-go">▶</span>
+      </button>
       <button id="btnMyCards" class="deck-btn mine">
         <b>📒 Mina kort</b>
         <span id="myCardsInfo" class="muted"></span>
@@ -360,6 +370,16 @@
     <section class="practice-menu">
       <h2>Hur vill du öva?</h2>
       <p id="pmInfo" class="muted"></p>
+      <button id="pmAdventure" class="pm-adventure">
+        <span class="adv-icon-wrap"><svg class="adv-icon" viewBox="0 0 64 64" aria-hidden="true">
+            <path d="M12 50 L27 33 L40 42 L53 14" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1 7"/>
+            <circle cx="12" cy="50" r="7.5" fill="#2fb344" stroke="#fff" stroke-width="2.5"/>
+            <circle cx="27" cy="33" r="7.5" fill="#1c9be6" stroke="#fff" stroke-width="2.5"/>
+            <circle cx="40" cy="42" r="7.5" fill="#f1c40f" stroke="#fff" stroke-width="2.5"/>
+            <circle cx="53" cy="14" r="7.5" fill="#e0479e" stroke="#fff" stroke-width="2.5"/></svg></span>
+        <span class="pm-adv-text"><b>Äventyr</b><small>Ta dig fram nivå för nivå – lås upp nya delar när du kan orden</small></span>
+        <span class="pm-adv-go">▶</span>
+      </button>
       <div id="pmGrid" class="pm-grid"></div>
     </section>
   </template>
@@ -501,6 +521,49 @@
     </section>
   </template>
 
+  <!-- Äventyr: stigen -->
+  <template id="tpl-adv">
+    <section class="adv">
+      <div class="adv-stats">
+        <span class="adv-stat streak" title="Dagar i rad">🔥 <b id="advStreak">0</b></span>
+        <span class="adv-stat level" title="Nivå och XP till nästa nivå">⭐ <b id="advLevel">1</b><span class="adv-xpbar"><i id="advXPBar"></i></span></span>
+        <span class="adv-stat xp" title="Total XP">⚡ <b id="advXP">0</b></span>
+        <span class="adv-stat goal" title="Dagens mål">🎯 <b id="advGoal">0/20</b></span>
+      </div>
+      <div id="advPath" class="adv-path"></div>
+    </section>
+  </template>
+
+  <!-- Äventyr: lektion -->
+  <template id="tpl-adv-lesson">
+    <section class="adv-lesson-view">
+      <div class="adv-top">
+        <button id="advQuit" class="adv-x" title="Avsluta" aria-label="Avsluta">✕</button>
+        <div class="adv-progress"><i id="advBar"></i></div>
+        <span id="advHearts" class="adv-hearts hidden"></span>
+        <button id="advAudio" class="adv-toggle" aria-label="Ljud av/på">🔊</button>
+        <button id="advMic" class="adv-toggle" aria-label="Mikrofon av/på">🎤</button>
+      </div>
+      <span id="combo" class="combo hidden adv-combo"></span>
+      <div id="advBody" class="adv-body"></div>
+      <div class="adv-footer">
+        <div id="advSheet" class="adv-sheet"></div>
+        <button id="advCheck" class="adv-btn big" disabled>KONTROLLERA</button>
+      </div>
+    </section>
+  </template>
+
+  <!-- Äventyr: klart -->
+  <template id="tpl-adv-done">
+    <section class="adv-done">
+      <div id="advDoneFig" class="adv-done-fig">🦎</div>
+      <h2 id="advDoneTitle"></h2>
+      <p id="advDoneSub" class="muted"></p>
+      <div id="advDoneStats" class="adv-done-stats"></div>
+      <div class="adv-footer"><button id="advDoneBtn" class="adv-btn big">FORTSÄTT</button></div>
+    </section>
+  </template>
+
   <template id="tpl-done">
     <section class="done">
       <div class="big">🎉</div>
@@ -517,5 +580,6 @@
   <script src="words.js"></script>
   <script src="verbs.js"></script>
   <script src="app.js"></script>
+  <script src="adventure.js"></script>
 </body>
 </html>

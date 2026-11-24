@@ -15,6 +15,11 @@ gör en commit och pushar till GitHub. Versionen syns uppe i appens titelrad.
 Stäng och öppna appen på enheterna för att få den nya versionen.
 
 ## Funktioner
+- **🗺️ Äventyr** (startsidan och Öva-menyn, logik i `adventure.js`): en stig med delar (Grundord, Spanska steg 3,
+  dina kategorier), lektioner om 5 ord, skattkistor och en kontrollpunkt 🏆 per del. Nästa nivå låses upp först när
+  alla övningar i lektionen är rätt – fel kommer tillbaka på slutet. Övningar: flerval, lyssna, skriv, ordbank,
+  prata och para ihop. 🔊/🎤 uppe i lektionen stänger av ljud/prat – samma fråga kommer då utan att höra/prata.
+  "⏩ Hoppa hit" på en låst del ger ett test med 3 hjärtan.
 - **▶ Öva** öppnar en meny med sätt att öva: Flashcards, Flerval (felsvaren liknar det rätta), Skrivförhör, Memory,
   Lyssna och skriv, Uttal (mikrofon, Chrome) och Verbböjning (spanska, 39 verb i presens/preteritum/imperfekt/futurum
   – finns i `verbs.js`). Nya sätt läggs till i listan `MODES` i `app.js`.
