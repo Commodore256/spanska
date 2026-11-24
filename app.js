@@ -405,6 +405,7 @@ function render(tplId, name) {
   view.innerHTML = "";
   view.appendChild(document.getElementById(tplId).content.cloneNode(true));
   view.scrollTop = 0;
+  playClass(view, "view-enter");
   currentView = name;
 }
 function $(sel) { return view.querySelector(sel); }
@@ -414,6 +415,64 @@ function el(tag, cls, text) {
   if (text !== undefined) e.textContent = text;
   return e;
 }
+// =====================================================================
+//  Animationer
+// =====================================================================
+function animOn() { return document.documentElement.dataset.anim !== "off"; }
+function wait(ms) { return new Promise(r => setTimeout(r, animOn() ? ms : 0)); }
+// Spelar en CSS-animation (klass) en gång, även om den redan spelats
+const ONE_SHOT = ["pop", "pop-in", "shake", "deal-in", "lift", "bounce-in", "row-new", "view-enter"];
+function playClass(elem, cls) {
+  if (!elem || !animOn()) return;
+  // Bara en engångsanimation åt gången på samma element
+  elem.classList.remove(...ONE_SHOT.filter(c => c !== "lift" || cls === "lift"));
+  void elem.offsetWidth;
+  elem.classList.add(cls);
+  const done = ev => {
+    if (ev.target !== elem || !ev.animationName) return;
+    elem.classList.remove(cls);
+    elem.removeEventListener("animationend", done);
+  };
+  elem.addEventListener("animationend", done);
+}
+// Liten konfetti-explosion från en punkt eller ett element
+function burst(from, emojis = ["✨", "⭐", "🎉", "💫"], count = 12) {
+  if (!animOn() || !from) return;
+  let x, y;
+  if (from instanceof Element) { const r = from.getBoundingClientRect(); x = r.left + r.width / 2; y = r.top + r.height / 2; }
+  else ({ x, y } = from);
+  for (let i = 0; i < count; i++) {
+    const p = el("span", "particle", emojis[i % emojis.length]);
+    p.style.left = x + "px"; p.style.top = y + "px";
+    document.body.append(p);
+    const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
+    const dist = 60 + Math.random() * 70;
+    p.animate([
+      { transform: "translate(-50%, -50%) scale(.4) rotate(0deg)", opacity: 1 },
+      { transform: `translate(calc(-50% + ${Math.cos(angle) * dist}px), calc(-50% + ${Math.sin(angle) * dist - 30}px)) scale(1.1) rotate(${Math.random() * 360 - 180}deg)`, opacity: 1, offset: 0.7 },
+      { transform: `translate(calc(-50% + ${Math.cos(angle) * dist * 1.15}px), calc(-50% + ${Math.sin(angle) * dist + 10}px)) scale(.8)`, opacity: 0 }
+    ], { duration: 750 + Math.random() * 250, easing: "cubic-bezier(.2,.7,.3,1)" }).onfinish = () => p.remove();
+  }
+}
+// Ripple-effekt när man trycker på knappar
+const RIPPLE_SEL = ".btn, .chip, .mode, .deck-btn, .round, .tool, .btn-small, .config-pick, .import-btn";
+document.addEventListener("pointerdown", e => {
+  if (!animOn()) return;
+  const b = e.target.closest(RIPPLE_SEL);
+  if (!b || b.disabled) return;
+  const r = b.getBoundingClientRect(), size = Math.max(r.width, r.height) * 2;
+  const rip = el("span", "ripple");
+  rip.style.width = rip.style.height = size + "px";
+  rip.style.left = (e.clientX - r.left - size / 2) + "px";
+  rip.style.top = (e.clientY - r.top - size / 2) + "px";
+  b.append(rip);
+  rip.addEventListener("animationend", () => rip.remove());
+});
+function setPbar(done, total) {
+  const f = view.querySelector("#pbarFill");
+  if (f) f.style.width = (total ? Math.round(100 * done / total) : 0) + "%";
+}
+
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
@@ -451,7 +510,7 @@ function showHome() {
   $("#myCardsInfo").textContent = total
     ? `${total} kort · ${known} kan du` + (warn ? ` · ${warn} att rätta 🟡` : "")
     : (isLanguage() ? "Inga kort än – tryck här och lägg till dina egna ord" : "Inga kort än – tryck här och lägg till begrepp");
-  $("#myCardsBar").style.width = total ? `${Math.round(100 * cards.reduce((s, c) => s + c.box, 0) / (total * MAX_BOX))}%` : "0";
+  $("#myCardsBar").dataset.w = total ? `${Math.round(100 * cards.reduce((s, c) => s + c.box, 0) / (total * MAX_BOX))}%` : "0%";
   $("#btnMyCards").onclick = showMyCards;
 
   const list = $("#deckList");
@@ -473,8 +532,12 @@ function showHome() {
     btn.append(el("b", "", deck.name), el("span", "muted", `${words.length} glosor · ${known} kan du`));
     const bar = el("div", "bar"), fill = el("i"); fill.style.width = pct + "%"; bar.append(fill); btn.append(bar);
     btn.onclick = () => showDeck(deck.id);
+    btn.style.setProperty("--i", list.children.length);
     list.appendChild(btn);
   }
+  // Staplarna fylls upp med en liten animation
+  view.querySelectorAll(".bar > i").forEach(i => { if (!i.dataset.w) { i.dataset.w = i.style.width || "0%"; } i.style.width = "0%"; });
+  requestAnimationFrame(() => requestAnimationFrame(() => view.querySelectorAll(".bar > i").forEach(i => { i.style.width = i.dataset.w; })));
   $("#btnUpdate").onclick = forceUpdate;
   $("#btnReset").onclick = () => {
     if (!confirm("Vill du nollställa all progress? (Dina kort finns kvar, bara statistiken nollas.)")) return;
@@ -488,6 +551,7 @@ function showHome() {
 //  Mina kort
 // =====================================================================
 let editingId = null;
+let justAdded = null;   // id på kortet som nyss lades till (glider in)
 
 function filteredCards() {
   const f = {
@@ -556,7 +620,10 @@ function showMyCards() {
     saveCards();
     inSv.value = ""; inEs.value = "";
     (sv ? inSv : inEs).focus();
+    justAdded = nc.id;
     renderCardList();
+    justAdded = null;
+    playClass(e.submitter || view.querySelector("#addForm .btn.good"), "pop");
     processQueue();
   };
 
@@ -565,6 +632,7 @@ function showMyCards() {
     chip.onclick = () => {
       listFilter = chip.dataset.filter; save(lsKey("filter"), listFilter);
       view.querySelectorAll("#filters .chip").forEach(c => c.classList.toggle("active", c === chip));
+      playClass(chip, "pop");
       renderCardList();
     };
   });
@@ -610,7 +678,11 @@ function renderCardList() {
     ul.append(el("li", "empty muted", cards.length ? "Inga kort matchar filtret." : "Inga kort än. Skriv ett ord ovanför!"));
     return;
   }
-  for (const c of list) ul.append(c.id === editingId ? cardEditRow(c) : cardRow(c));
+  for (const c of list) {
+    const row = c.id === editingId ? cardEditRow(c) : cardRow(c);
+    if (c.id === justAdded) playClass(row, "row-new");
+    ul.append(row);
+  }
 }
 
 function cardRow(c) {
@@ -632,7 +704,11 @@ function cardRow(c) {
   const bEdit = el("button", "", "✏️"); bEdit.title = "Ändra"; bEdit.onclick = () => { editingId = c.id; renderCardList(); };
   const bMark = el("button", isWarn(c) ? "active" : "", "🟡");
   bMark.title = isWarn(c) ? "Ta bort gulmarkering" : "Gulmarkera";
-  bMark.onclick = () => { toggleYellow(c); renderCardList(); };
+  bMark.onclick = () => {
+    const r = bMark.getBoundingClientRect();
+    const on = toggleYellow(c); renderCardList();
+    if (on) burst({ x: r.left + r.width / 2, y: r.top + r.height / 2 }, ["🟡", "✨"], 6);
+  };
   const bTrash = el("button", "", "🗑"); bTrash.title = "Ta bort";
   bTrash.onclick = () => { if (confirm(`Ta bort kortet "${c.sv} – ${c.es}"?`)) { deleteCard(c); renderCardList(); } };
   actions.append(bSpeak, bEdit, bMark, bTrash);
@@ -1033,6 +1109,7 @@ function runSwipe(terms, usedAi, notice) {
         else if (t.sv && t.es) { c.check = { status: "unchecked" }; c.filled = t.filled || null; c.filledBy = t.by || null; }
         cards.unshift(c); saveCards();
         history.push({ cardId: c.id }); added++;
+        burst(stack, ["💚", "✨", "⭐", "💛"], 10);
       } else history.push({ cardId: null });
       index++; busy = false;
       show();
@@ -1166,9 +1243,15 @@ function buildSession(deck) {
 }
 
 
-function showDone(deck, text, again) {
+function showDone(deck, text, again, right = 0, total = 0) {
   render("tpl-done", "done");
   $("#doneText").textContent = text;
+  const big = view.querySelector(".big");
+  const share = total ? right / total : 0;
+  big.textContent = share >= 0.8 ? "🎉" : share >= 0.5 ? "💪" : "🌱";
+  view.querySelector("h2").textContent = share >= 0.8 ? "¡Muy bien!" : share >= 0.5 ? "¡Bien hecho!" : "¡Sigue así!";
+  playClass(big, "bounce-in");
+  if (share >= 0.5) setTimeout(() => burst(big, ["🎉", "⭐", "✨", "🎊", "💫"], 18), 250);
   $("#btnAgain").onclick = again;
   $("#btnBack").onclick = deck.back;
 }
@@ -1180,6 +1263,8 @@ function practiceTools(getCur, onRemoved) {
   bMark.onclick = () => {
     const cur = getCur(); if (!cur) return;
     const on = cur.item.toggleYellow();
+    playClass(bMark, "pop");
+    if (on) burst(bMark, ["🟡", "✨"], 6);
     toast(cur.item.yellowText(on));
     refresh();
   };
@@ -1200,42 +1285,75 @@ function runCards(deck) {
   render("tpl-cards", "cards");
   goBack = deck.back; reopen = deck.back;
   const queue = buildSession(deck), total = queue.length;
-  let right = 0, cur = null, flipped = false;
-  const front = $("#cardFront"), back = $("#cardBack"), tag = $("#cardLang");
+  let right = 0, cur = null, flipped = false, revealed = false, busy = false, done = 0;
+  const card = $("#card"), front = $("#cardFront"), back = $("#cardBack");
+  const answerRow = $("#answerRow");
   const refreshTools = practiceTools(() => cur, id => { dropFromQueue(queue, id); next(); });
 
-  function next() {
-    if (!queue.length) return showDone(deck, `Du kunde ${right} av ${total} på första försöket.`, () => runCards(deck));
-    cur = queue.shift(); flipped = false;
-    refreshTools();
+  function fill() {
     const { item, showSv } = cur;
     const L = sideLabels();
-    tag.textContent = showSv ? L.sv : L.es;
-    back.classList.toggle("long", (showSv ? item.es : item.sv).length > 40);
-    front.classList.toggle("long", (showSv ? item.sv : item.es).length > 40);
-    front.textContent = showSv ? item.sv : item.es;
-    back.textContent = showSv ? item.es : item.sv;
-    back.classList.add("hidden");
-    $("#answerRow").classList.add("hidden");
+    const q = showSv ? item.sv : item.es, a = showSv ? item.es : item.sv;
+    $("#cardLang").textContent = showSv ? L.sv : L.es;
+    $("#cardLangBack").textContent = showSv ? L.es : L.sv;
+    front.textContent = q; back.textContent = a; $("#cardQ").textContent = q;
+    front.classList.toggle("long", q.length > 40);
+    back.classList.toggle("long", a.length > 40);
     $("#progress").textContent = `${total - queue.length} / ${total}`;
-    if (!showSv) speak(item.es);
+    setPbar(done, total);
+  }
+  function setFace(toBack) {
+    flipped = toBack;
+    card.classList.toggle("flipped", toBack);
+    playClass(card, "lift");                       // kortet lyfts lite medan det vänds
+  }
+  function next() {
+    if (!queue.length) return showDone(deck, `Du kunde ${right} av ${total} på första försöket.`, () => runCards(deck), right, total);
+    cur = queue.shift(); revealed = false;
+    refreshTools();
+    // Lägg det nya kortet med framsidan upp utan vändanimation
+    card.classList.add("no-trans"); card.classList.remove("flipped"); flipped = false;
+    fill();
+    void card.offsetWidth; card.classList.remove("no-trans");
+    answerRow.classList.add("hidden");
+    playClass(card, "deal-in");
+    if (!cur.showSv) speak(cur.item.es);
   }
   function flip() {
-    if (flipped) return;
-    flipped = true;
-    back.classList.remove("hidden");
-    $("#answerRow").classList.remove("hidden");
-    if (cur.showSv) speak(cur.item.es);
+    if (busy) return;
+    setFace(!flipped);
+    if (!revealed) {
+      revealed = true;
+      answerRow.classList.remove("hidden");
+      playClass(answerRow, "pop-in");
+      if (cur.showSv) speak(cur.item.es);
+    }
   }
-  $("#card").onclick = flip;
-  $("#card").onkeydown = e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); flip(); } };
-  $("#btnSpeak").onclick = () => speak(cur.item.es);
-  $("#btnRight").onclick = () => { if (!cur.retry) { right++; cur.item.record(true); } next(); };
-  $("#btnWrong").onclick = () => {
-    if (!cur.retry) cur.item.record(false);
-    queue.splice(Math.min(3, queue.length), 0, { ...cur, retry: true });   // kommer tillbaka snart
+  async function answer(ok, btn) {
+    if (busy || !revealed) return;
+    busy = true;
+    if (!cur.retry) { if (ok) right++; cur.item.record(ok); }
+    if (ok) { done++; burst(btn); }
+    else queue.splice(Math.min(3, queue.length), 0, { ...cur, retry: true });   // kommer tillbaka snart
+    setPbar(done, total);
+    if (!ok) { playClass(card, "shake"); await wait(260); }
+    card.classList.add(ok ? "out-right" : "out-left");
+    await wait(330);
+    card.classList.remove("out-right", "out-left");
+    busy = false;
     next();
+  }
+  card.onclick = flip;
+  card.onkeydown = e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); flip(); } };
+  document.onkeydown = e => {
+    if (e.target.closest("input, textarea, select")) return;
+    if (e.key === "ArrowRight") answer(true, $("#btnRight"));
+    else if (e.key === "ArrowLeft") answer(false, $("#btnWrong"));
+    else if (e.key === " " && e.target === document.body) { e.preventDefault(); flip(); }
   };
+  $("#btnSpeak").onclick = e => { e.stopPropagation(); speak(cur.item.es); };
+  $("#btnRight").onclick = e => answer(true, e.currentTarget);
+  $("#btnWrong").onclick = e => answer(false, e.currentTarget);
   next();
 }
 
@@ -1244,12 +1362,13 @@ function runWrite(deck) {
   goBack = deck.back; reopen = deck.back;
   setupAccents(view);
   const queue = buildSession(deck), total = queue.length;
-  let right = 0, cur = null, answered = false;
+  let right = 0, cur = null, answered = false, done = 0;
   const input = $("#answer"), feedback = $("#feedback"), btnNext = $("#btnNext");
+  const promptCard = view.querySelector(".card.static");
   const refreshTools = practiceTools(() => cur, id => { dropFromQueue(queue, id); next(); });
 
   function next() {
-    if (!queue.length) return showDone(deck, `Du hade ${right} av ${total} rätt på första försöket.`, () => runWrite(deck));
+    if (!queue.length) return showDone(deck, `Du hade ${right} av ${total} rätt på första försöket.`, () => runWrite(deck), right, total);
     cur = queue.shift(); answered = false;
     refreshTools();
     const { item, showSv } = cur;
@@ -1259,6 +1378,8 @@ function runWrite(deck) {
     input.placeholder = showSv ? `Skriv på ${langInfo().name.toLowerCase()}…` : "Skriv på svenska…";
     input.lang = showSv ? cfg().lang : "sv";
     $("#progress").textContent = `${total - queue.length} / ${total}`;
+    setPbar(done, total);
+    playClass(promptCard, "deal-in");
     input.value = ""; input.disabled = false;
     feedback.className = "feedback hidden";
     btnNext.classList.add("hidden");
@@ -1278,12 +1399,18 @@ function runWrite(deck) {
       if (!cur.retry) { right++; item.record(true); }
       feedback.className = "feedback " + (result === "ok" ? "ok" : "almost");
       feedback.textContent = result === "ok" ? `✓ Rätt! ${correct}` : `Nästan! Tänk på accenterna: ${correct}`;
+      done++;
+      playClass(promptCard, "pop");
+      burst(promptCard, result === "ok" ? ["✨", "⭐", "🎉", "💫"] : ["⭐", "✨"], result === "ok" ? 12 : 6);
     } else {
       if (!cur.retry) item.record(false);
       queue.splice(Math.min(3, queue.length), 0, { ...cur, retry: true });
       feedback.className = "feedback no";
       feedback.textContent = `Rätt svar: ${correct}`;
+      playClass(promptCard, "shake");
     }
+    setPbar(done, total);
+    playClass(feedback, "pop-in");
     speak(item.es);
     btnNext.classList.remove("hidden");
     btnNext.focus();
@@ -1311,6 +1438,13 @@ function showSettings() {
   const dark = $("#darkToggle");
   dark.checked = currentTheme() === "dark";
   dark.onchange = () => setTheme(dark.checked ? "dark" : "light");
+  const anim = $("#animToggle");
+  anim.checked = animOn();
+  anim.onchange = () => {
+    document.documentElement.dataset.anim = anim.checked ? "on" : "off";
+    save("app.anim", anim.checked ? "on" : "off");
+    if (anim.checked) burst(anim.closest(".setting-row"), ["✨", "⭐", "🎉"], 10);
+  };
 
   const ai = aiConfig();
   $("#aiUrl").value = ai.url || "";

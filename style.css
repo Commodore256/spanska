@@ -339,3 +339,114 @@ html[data-theme="dark"] .drawer-bg { background: rgba(0,0,0,.55); }
 .cat-btns { display: flex; gap: 6px; margin-left: auto; }
 .deck-group { grid-column: 1 / -1; margin: 8px 0 0; font-size: 1.05rem; }
 .deck-group small { font-weight: 400; font-size: .85rem; }
+
+/* =====================================================================
+   Animationer
+   ===================================================================== */
+
+/* ---------- Flashcards som riktiga kort ---------- */
+.card-stage { position: relative; perspective: 1400px; margin: 6px 4px 4px; }
+/* två kort under, så det ser ut som en kortlek */
+.card-stage::before, .card-stage::after {
+  content: ""; position: absolute; left: 10px; right: 10px; height: 100%; border-radius: 20px;
+  background: var(--card); border: 1px solid var(--border); z-index: 0;
+}
+.card-stage::before { top: 10px; transform: rotate(-1.6deg); filter: brightness(.94); }
+.card-stage::after { top: 5px; transform: rotate(1.2deg); filter: brightness(.97); }
+.flipcard { position: relative; z-index: 1; height: 270px; cursor: pointer; outline: none; transition: transform .2s; }
+.flipcard:focus-visible .card-face { outline: 3px solid var(--yellow); outline-offset: 3px; }
+.flipcard-inner {
+  position: absolute; inset: 0; transform-style: preserve-3d;
+  transition: transform .65s cubic-bezier(.3, 1.35, .45, 1);
+}
+.flipcard.flipped .flipcard-inner { transform: rotateY(180deg); }
+.flipcard.no-trans .flipcard-inner { transition: none; }
+.card-face {
+  position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  border-radius: 20px; padding: 30px 22px; display: flex; flex-direction: column; overflow-y: auto;
+  align-items: center; justify-content: center; text-align: center; user-select: none;
+  background: linear-gradient(160deg, transparent 55%, rgba(241,196,15,.12) 100%), var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 26px rgba(0,0,0,.16), inset 0 0 0 6px rgba(192,57,43,.05);
+}
+.face-front::after {               /* liten hörndekoration som på ett spelkort */
+  content: "Ñ"; position: absolute; right: 14px; bottom: 8px; font-weight: 800; font-size: 1.1rem;
+  color: var(--red); opacity: .25;
+}
+.face-back {
+  transform: rotateY(180deg);
+  background: linear-gradient(160deg, transparent 30%, rgba(39,174,96,.12) 100%), var(--card);
+}
+.card-q { font-size: 1rem; color: var(--muted); margin-bottom: 6px; }
+.face-back .card-text.back { margin-top: 0; }
+@media (hover: hover) { .flipcard:hover { transform: translateY(-4px); } }
+
+/* lyft medan kortet vänds */
+.flipcard.lift { animation: lift .65s ease-out; }
+@keyframes lift { 0% { transform: none; } 40% { transform: translateY(-14px) scale(1.04); } 100% { transform: none; } }
+/* nytt kort delas ut */
+.flipcard.deal-in, .card.static.deal-in { animation: dealIn .42s cubic-bezier(.2, .9, .3, 1.2); }
+@keyframes dealIn { from { transform: translate(40px, -30px) rotate(6deg) scale(.92); opacity: 0; } to { transform: none; opacity: 1; } }
+/* kort som flyger iväg efter svar */
+.flipcard.out-right { animation: outRight .33s ease-in forwards; }
+.flipcard.out-left { animation: outLeft .33s ease-in forwards; }
+@keyframes outRight { to { transform: translateX(130%) rotate(18deg); opacity: 0; } }
+@keyframes outLeft { to { transform: translateX(-130%) rotate(-18deg); opacity: 0; } }
+.flipcard.out-right .card-face { box-shadow: 0 0 0 4px var(--good), 0 10px 26px rgba(0,0,0,.16); }
+.flipcard.out-left .card-face { box-shadow: 0 0 0 4px var(--bad), 0 10px 26px rgba(0,0,0,.16); }
+/* skakning vid fel */
+.shake { animation: shake .4s; }
+@keyframes shake { 0%,100% { transform: none; } 20% { transform: translateX(-10px) rotate(-1.5deg); } 40% { transform: translateX(9px) rotate(1deg); } 60% { transform: translateX(-6px); } 80% { transform: translateX(4px); } }
+
+/* ---------- Förloppsstapel i övningarna ---------- */
+.pbar { height: 8px; border-radius: 99px; background: rgba(127,127,127,.2); overflow: hidden; margin: 0 2px 12px; }
+.pbar > i { display: block; height: 100%; width: 0; border-radius: 99px;
+  background: linear-gradient(90deg, var(--good), #7bd88f); transition: width .5s cubic-bezier(.3, 1.3, .5, 1); }
+
+/* ---------- Knappar: tryck, ripple, pop ---------- */
+.btn, .chip, .mode, .deck-btn, .round, .tool, .btn-small, .icon-btn, .config-pick, .import-btn, .accents button, .crd .actions button {
+  transition: transform .14s cubic-bezier(.3, 1.5, .5, 1), box-shadow .2s, background-color .2s, opacity .2s;
+}
+.btn:active, .chip:active, .mode:active, .deck-btn:active, .round:active, .tool:active, .btn-small:active,
+.icon-btn:active, .config-pick:active, .import-btn:active, .accents button:active, .crd .actions button:active {
+  transform: scale(.93);
+}
+@media (hover: hover) {
+  .btn:hover, .mode:hover, .deck-btn:hover, .round:hover { transform: translateY(-2px); }
+  .mode:hover, .deck-btn:hover { box-shadow: 0 6px 16px rgba(0,0,0,.12); }
+}
+.btn, .chip, .mode, .deck-btn, .round, .tool, .btn-small, .config-pick, .import-btn { position: relative; overflow: hidden; }
+.ripple {
+  position: absolute; border-radius: 50%; background: currentColor; opacity: .25; pointer-events: none;
+  transform: scale(0); animation: ripple .55s ease-out forwards;
+}
+@keyframes ripple { to { transform: scale(1); opacity: 0; } }
+.pop { animation: pop .35s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.15); } 100% { transform: scale(1); } }
+.pop-in { animation: popIn .35s cubic-bezier(.3, 1.5, .5, 1); }
+@keyframes popIn { from { transform: translateY(10px) scale(.9); opacity: 0; } to { transform: none; opacity: 1; } }
+.bounce-in { animation: bounceIn .7s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes bounceIn { 0% { transform: scale(.2) rotate(-20deg); opacity: 0; } 60% { transform: scale(1.25) rotate(8deg); opacity: 1; } 100% { transform: none; } }
+.card.static.pop { animation: pop .4s cubic-bezier(.3, 1.6, .5, 1); }
+
+/* konfetti */
+.particle { position: fixed; z-index: 50; pointer-events: none; font-size: 1.3rem; will-change: transform, opacity; }
+
+/* ---------- Vyer, listor och staplar ---------- */
+.view-enter { animation: viewIn .28s ease-out; }
+@keyframes viewIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.deck-list .deck-btn { animation: viewIn .35s ease-out backwards; animation-delay: calc(var(--i, 0) * 40ms); }
+.bar > i { transition: width .9s cubic-bezier(.3, 1.2, .5, 1); }
+.row-new { animation: rowNew .9s ease-out; }
+@keyframes rowNew {
+  0% { transform: translateY(-14px) scale(.97); opacity: 0; box-shadow: 0 0 0 3px var(--good); }
+  40% { transform: none; opacity: 1; box-shadow: 0 0 0 3px var(--good); }
+  100% { box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+}
+.chip.active { transition: background-color .2s, color .2s, transform .14s; }
+
+/* ---------- Animationer avstängda (inställning) ---------- */
+html[data-anim="off"] *, html[data-anim="off"] *::before, html[data-anim="off"] *::after {
+  animation: none !important; transition: none !important;
+}
+html[data-anim="off"] .ripple, html[data-anim="off"] .particle { display: none; }

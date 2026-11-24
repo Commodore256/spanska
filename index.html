@@ -17,6 +17,10 @@
       try { t = JSON.parse(localStorage.getItem("app.theme")); } catch (e) {}
       if (t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
       document.documentElement.dataset.theme = t;
+      var a = null;
+      try { a = JSON.parse(localStorage.getItem("app.anim")); } catch (e) {}
+      if (a !== "on" && a !== "off") a = matchMedia("(prefers-reduced-motion: reduce)").matches ? "off" : "on";
+      document.documentElement.dataset.anim = a;
     })();
   </script>
 </head>
@@ -182,11 +186,23 @@
         <button id="btnTrash" class="tool" title="Ta bort kortet">🗑 <span>Ta bort</span></button>
       </div>
       </div>
-      <div id="card" class="card" tabindex="0">
-        <small id="cardLang" class="lang-tag"></small>
-        <div id="cardFront" class="card-text"></div>
-        <div id="cardBack" class="card-text back hidden"></div>
-        <small class="hint">Tryck för att vända</small>
+      <div class="pbar"><i id="pbarFill"></i></div>
+      <div class="card-stage">
+        <div id="card" class="flipcard" tabindex="0" role="button" aria-label="Vänd kortet">
+          <div class="flipcard-inner">
+            <div class="card-face face-front">
+              <small id="cardLang" class="lang-tag"></small>
+              <div id="cardFront" class="card-text"></div>
+              <small class="hint">Tryck för att vända</small>
+            </div>
+            <div class="card-face face-back">
+              <small id="cardLangBack" class="lang-tag"></small>
+              <div id="cardQ" class="card-q"></div>
+              <div id="cardBack" class="card-text back"></div>
+              <small class="hint">Tryck för att vända tillbaka</small>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="row">
         <button id="btnSpeak" class="btn secondary">🔊 Lyssna</button>
@@ -206,6 +222,7 @@
         <button id="btnTrash" class="tool" title="Ta bort kortet">🗑 <span>Ta bort</span></button>
       </div>
       </div>
+      <div class="pbar"><i id="pbarFill"></i></div>
       <div class="card static">
         <small id="promptLang" class="lang-tag"></small>
         <div id="prompt" class="card-text"></div>
@@ -232,6 +249,11 @@
       <div class="setting-row">
         <span class="setting-text"><b>🌙 Mörkt läge</b><small class="muted">Mörk bakgrund och ljus text</small></span>
         <label class="switch"><input id="darkToggle" type="checkbox" role="switch" aria-label="Mörkt läge"><span class="slider"></span></label>
+      </div>
+
+      <div class="setting-row">
+        <span class="setting-text"><b>✨ Animationer</b><small class="muted">Vändande kort, konfetti och små effekter på knappar</small></span>
+        <label class="switch"><input id="animToggle" type="checkbox" role="switch" aria-label="Animationer"><span class="slider"></span></label>
       </div>
 
       <h2>AI-koppling</h2>
