@@ -1713,7 +1713,7 @@ function runCards(deck) {
     if (ok && !cur.retry) right++;
     sess.answer(cur.item, ok, btn, "cards", cur.retry);
     if (ok) { done++; burst(btn); }
-    else queue.splice(Math.min(3, queue.length), 0, { ...cur, retry: true });   // kommer tillbaka snart
+    else if (!deck.noRetry) queue.splice(Math.min(3, queue.length), 0, { ...cur, retry: true });   // kommer tillbaka snart
     setPbar(done, total);
     if (!ok) { playClass(card, "shake"); await wait(260); if (!alive(card)) return; }
     card.classList.add(ok ? "out-right" : "out-left");

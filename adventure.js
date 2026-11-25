@@ -742,7 +742,7 @@ function addCardButton(w) {
 function runChapterReview(labelNode, unit) {
   const added = [];
   const make = () => ({
-    id: "adv-review", name: `Repetera: ${labelNode.text}`, all: true,
+    id: "adv-review", name: `Repetera: ${labelNode.text}`, all: true, noRetry: true,   // varje kort visas bara en gång
     back: () => showAdventure(),
     restart: () => { added.length = 0; return make(); },
     doneNote: () => added.length
