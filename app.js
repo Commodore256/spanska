@@ -587,7 +587,7 @@ function render(tplId, name) {
   window.speechSynthesis?.cancel();
   document.onkeydown = null;
   view.onclick = null;
-  document.body.classList.remove("adv-lesson");   // lektionsläget döljer toppraden
+  document.body.classList.remove("adv-lesson", "adv-bg");   // lektionsläget döljer toppraden
   view.innerHTML = "";
   view.appendChild(document.getElementById(tplId).content.cloneNode(true));
   view.scrollTop = 0;
@@ -835,6 +835,36 @@ function renderStatsPanel() {
 let editingId = null;
 let justAdded = null;   // id på kortet som nyss lades till (glider in)
 
+// Be AI:n översätta/kontrollera kort på nytt. En sida som fyllts i av lexikon eller
+// maskinöversättning (📖/🌐) töms först, så att AI:n översätter den själv.
+function askAi(list) {
+  if (!aiEnabled()) { toast("AI:n är inte kopplad – logga in eller fyll i AI-koppling under ⚙"); return; }
+  let n = 0;
+  for (const c of list) {
+    if (!c.sv && !c.es) continue;
+    if (c.filled && c.filledBy !== "ai" && c[c.filled === "sv" ? "es" : "sv"]) { c[c.filled] = ""; c.filled = null; c.filledBy = null; }
+    c.check = { status: "pending" };
+    n++;
+  }
+  if (!n) return;
+  saveCards();
+  renderCardList();
+  toast(n === 1 ? "🤖 Skickat till AI:n" : `🤖 ${n} kort skickade till AI:n`);
+  processQueue();
+}
+// Lägg till ett ord i Mina kort (från Äventyr). Returnerar false om det redan finns.
+function addToMyCards(sv, es, cat = null) {
+  if (!sv || !es) return false;
+  if (cards.some(c => sameText(c.es, es) || (sameText(c.sv, sv) && sameText(c.es, es)))) return false;
+  const c = newCard(sv, es);
+  c.check = { status: "ok" };
+  c.cat = cat;
+  cards.unshift(c);
+  saveCards();
+  return true;
+}
+function inMyCards(es) { return cards.some(c => sameText(c.es, es)); }
+
 function filteredCards() {
   const f = {
     all: () => true,
@@ -842,7 +872,8 @@ function filteredCards() {
     known: isKnown,
     never: c => c.seen === 0,
     hard: c => c.wrong > c.right,
-    unchecked: isUnchecked
+    unchecked: isUnchecked,
+    noai: c => !c.check?.byAi
   }[listFilter] || (() => true);
   const coll = (a, b, k, loc) => (a[k] || "").localeCompare(b[k] || "", loc);
   const s = {
@@ -950,6 +981,12 @@ function renderCardList() {
   updateAiStatus();
   const list = filteredCards();
   $("#listCount").textContent = `${list.length} av ${cards.length} kort`;
+  const bulk = view.querySelector("#btnAiAll");
+  if (bulk) {
+    bulk.classList.toggle("hidden", listFilter !== "noai" || !list.length);
+    bulk.textContent = `🤖 Låt AI:n ta alla ${list.length}`;
+    bulk.onclick = () => askAi(list);
+  }
   const info = view.querySelector("#practiceInfo");
   if (info) {
     const usable = list.filter(c => c.sv && c.es);
@@ -996,7 +1033,10 @@ function cardRow(c) {
   };
   const bTrash = el("button", "", "🗑"); bTrash.title = "Ta bort";
   bTrash.onclick = () => { if (confirm(`Ta bort kortet "${c.sv} – ${c.es}"?`)) { deleteCard(c); renderCardList(); } };
-  actions.append(bSpeak, bEdit, bMark, bTrash);
+  const bAi = el("button", c.check?.status === "pending" ? "ai-busy" : "", "🤖");
+  bAi.title = "Låt AI:n översätta och kontrollera kortet";
+  bAi.onclick = () => askAi([c]);
+  actions.append(bSpeak, bEdit, bAi, bMark, bTrash);
 
   const stats = el("div", "stats");
   stats.title = "Övad · kunde · kunde inte";
@@ -1539,8 +1579,9 @@ function dueItems(items) { const now = Date.now(); return items.filter(i => (i.d
 function buildSession(deck, size = SESSION_SIZE) {
   const dir = load(lsKey("dir"), "mix");
   let pool = deck.items;
+  if (deck.all) size = pool.length;   // repetition: alla kort, utan smart repetition
   // Smart repetition: kort som ska repeteras idag först. Finns inga övar du i förväg.
-  if (srOn()) { const due = dueItems(pool); if (due.length) pool = due; }
+  else if (srOn()) { const due = dueItems(pool); if (due.length) pool = due; }
   return shuffle(pool)
     .sort((a, b) => a.box() - b.box())
     .slice(0, size)
@@ -1645,7 +1686,7 @@ function runCards(deck) {
     playClass(card, "lift");                       // kortet lyfts lite medan det vänds
   }
   function next() {
-    if (!queue.length) return showDone(deck, `Du kunde ${right} av ${total} på första försöket.`, () => runCards(deck), right, total);
+    if (!queue.length) return showDone(deck, `Du kunde ${right} av ${total} på första försöket.` + (deck.doneNote ? " " + deck.doneNote() : ""), () => runCards(deck.restart ? deck.restart() : deck), right, total);
     cur = queue.shift(); revealed = false;
     refreshTools();
     // Lägg det nya kortet med framsidan upp utan vändanimation

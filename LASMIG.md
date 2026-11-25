@@ -15,6 +15,10 @@ gör en commit och pushar till GitHub. Versionen syns uppe i appens titelrad.
 Stäng och öppna appen på enheterna för att få den nya versionen.
 
 ## Funktioner
+- **Äventyr, nytt**: livligare bakgrund, "＋ Lägg till i Mina kort" efter varje svar, och "🔁 Repetera" på varje
+  kapitelnamn (alla begrepp som flashcards – det du inte kan på första försöket hamnar i Mina kort).
+- **🤖 per kort i Mina kort**: be AI:n översätta/kontrollera kortet på nytt. Filtret "🤖 Inte av AI" visar kort som
+  inte är AI-kontrollerade, med knappen "Låt AI:n ta alla".
 - **👥 Delat konto** (`sync.js`, `config.js`): när `WORKER_URL` i `config.js` är ifylld frågar appen efter lösenord,
   och alla som loggar in delar samma kort, XP, streak och märken. Ändringar från olika enheter slås ihop.
   ☁️ vid versionsnumret = synkat. ⚙ → Konto: Synka nu / Logga ut. Se `ai-worker/AI-INSTALLATION.md`.

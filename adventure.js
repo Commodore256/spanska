@@ -57,7 +57,7 @@ function advUnits() {
       mascot: ADV_MASCOTS[units.length % ADV_MASCOTS.length], nodes: [] };
     let lessons = 0;
     for (const g of groups) {
-      u.nodes.push({ type: "label", text: g.label });
+      u.nodes.push({ type: "label", text: g.label, words: g.items, idBase: g.idBase, catId: g.catId || null });
       if (!g.items.length) { u.nodes.push({ type: "empty", id: g.idBase + ":empty", group: g }); continue; }
       const chunks = advChunks(g.items);
       chunks.forEach((words, k) => {
@@ -124,6 +124,7 @@ function showAdventure(opts = {}) {
   titleEl.textContent = "Äventyr";
   goBack = advBack || showHome; reopen = () => showAdventure();
   render("tpl-adv", "adv");
+  document.body.classList.add("adv-bg");
   const units = advUnits(), current = advStatus(units);
 
   // Statusrad: streak, nivå, XP och dagens mål
@@ -160,7 +161,22 @@ function showAdventure(opts = {}) {
     const col = el("div", "adv-path-col");
     let i = 0, mascotPlaced = false;
     for (const n of u.nodes) {
-      if (n.type === "label") { col.append(el("div", "adv-label", n.text)); continue; }
+      if (n.type === "label") {
+        // Kapitelnamnet är också en knapp för att repetera hela kapitlet
+        const st = advState();
+        const started = n.words.length && u.nodes.some(x => x.type === "lesson" && x.id.startsWith(n.idBase + ":L") && st[x.id]?.done);
+        const lab = el("button", "adv-label" + (started ? " can-repeat" : ""));
+        lab.append(el("span", "", n.text));
+        if (started) lab.append(el("span", "adv-label-rep", "🔁 Repetera"));
+        lab.title = started ? `Repetera alla ${n.words.length} begrepp i ${n.text}` : "Klara minst en lektion i kapitlet för att kunna repetera det";
+        lab.onclick = e => {
+          e.stopPropagation();
+          if (!started) { toast(n.words.length ? "🔒 Klara minst en lektion i kapitlet först" : "Inga kort i kapitlet än"); playClass(lab, "shake"); return; }
+          runChapterReview(n, u);
+        };
+        col.append(lab);
+        continue;
+      }
       const wrap = el("div", "adv-node-wrap");
       const off = ADV_OFFSETS[i % ADV_OFFSETS.length];
       wrap.style.setProperty("--x", off + "px");
@@ -321,7 +337,7 @@ function runAdvLesson(node, unit) {
   const plan = advPlan(node);
   if (!plan.length) { toast("Det finns inga ord att öva på här än"); return; }
   render("tpl-adv-lesson", "adv-lesson");
-  document.body.classList.add("adv-lesson");
+  document.body.classList.add("adv-lesson", "adv-bg");
   titleEl.textContent = "Äventyr";
   const quit = () => { if (confirm("Vill du avsluta? Du förlorar det du gjort i den här lektionen.")) showAdventure(); };
   goBack = quit; reopen = () => showAdventure();
@@ -604,6 +620,7 @@ function runAdvLesson(node, unit) {
       sheet.append(el("div", "adv-sheet-label", "Rätt svar:"), el("div", "adv-sheet-text", r.correct));
       if (w) sheet.append(el("div", "adv-sheet-sub", lang ? `${w.es} = ${w.sv}` : `${w.sv}: ${w.es}`));
     }
+    if (w && w.sv && w.es) sheet.append(addCardButton(w));
     checkBtn.classList.remove("hidden");
     checkBtn.disabled = false;
     checkBtn.textContent = "FORTSÄTT";
@@ -664,7 +681,7 @@ function runAdvLesson(node, unit) {
     xpEarned += bonus;
 
     render("tpl-adv-done", "adv-done");
-    document.body.classList.add("adv-lesson");
+    document.body.classList.add("adv-lesson", "adv-bg");
     goBack = () => showAdventure(); reopen = goBack;
     const big = $("#advDoneFig");
     big.textContent = node.type === "check" || node.type === "jump" ? "🏆" : (unit?.mascot || "🦎");
@@ -688,11 +705,59 @@ function runAdvLesson(node, unit) {
 
 function advFail(node) {
   render("tpl-adv-done", "adv-done");
-  document.body.classList.add("adv-lesson");
+  document.body.classList.add("adv-lesson", "adv-bg");
   goBack = () => showAdventure(); reopen = goBack;
   $("#advDoneFig").textContent = "💔";
   $("#advDoneTitle").textContent = "Slut på hjärtan";
   $("#advDoneSub").textContent = "Testet blev inte godkänt den här gången. Öva på delarna innan, eller försök igen.";
   playClass($("#advDoneFig"), "shake");
   $("#advDoneBtn").onclick = () => showAdventure();
+}
+
+// ---------- Spara ett ord från Äventyr som flashcard i Mina kort ----------
+function addCardButton(w) {
+  const b = el("button", "adv-add");
+  b.type = "button";
+  const draw = () => {
+    const has = inMyCards(w.es);
+    b.textContent = has ? "✓ Finns i Mina kort" : "＋ Lägg till i Mina kort";
+    b.disabled = has;
+  };
+  draw();
+  b.onclick = e => {
+    e.stopPropagation();
+    if (addToMyCards(w.sv, w.es)) {
+      toast(`📒 "${w.es}" finns nu i Mina kort`);
+      burst(b, ["📒", "✨"], 8);
+      playClass(b, "pop");
+    }
+    draw();
+  };
+  return b;
+}
+
+// ---------- Repetera ett kapitel som flashcards ----------
+// Alla begrepp i kapitlet, i flashcard-stil. Det du inte kan på första försöket
+// läggs automatiskt till i Mina kort.
+function runChapterReview(labelNode, unit) {
+  const added = [];
+  const make = () => ({
+    id: "adv-review", name: `Repetera: ${labelNode.text}`, all: true,
+    back: () => showAdventure(),
+    restart: () => { added.length = 0; return make(); },
+    doneNote: () => added.length
+      ? `${added.length} ${added.length === 1 ? "ord" : "ord"} som du inte kunde lades till i Mina kort: ${added.join(", ")}.`
+      : "Du kunde allt – inget behövde läggas till i Mina kort.",
+    items: labelNode.words.map(w => ({
+      ...w,
+      record: (ok, opt) => {
+        const res = w.record(ok, opt);
+        if (!ok && addToMyCards(w.sv, w.es)) { added.push(w.es); toast(`📒 "${w.es}" lades till i Mina kort`); }
+        return res;
+      }
+    }))
+  });
+  runCards(make());
+  document.body.classList.add("adv-bg");
+  titleEl.textContent = `🔁 ${labelNode.text}`;
 }
