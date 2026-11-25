@@ -350,8 +350,16 @@ async function fetchJson(url, options = {}, timeoutMs = 20000) {
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const resp = await fetch(url, { ...options, signal: ctrl.signal });
-    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    if (!resp.ok) {
+      // Ta med serverns felmeddelande, så att det går att se vad som gick fel
+      let msg = "HTTP " + resp.status;
+      try { const d = await resp.json(); if (d && d.error) msg = d.error + (d.detail ? " – " + String(d.detail).slice(0, 160) : ""); } catch { /* inget JSON */ }
+      const err = new Error(msg); err.status = resp.status; throw err;
+    }
     return await resp.json();
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error("Servern svarade inte i tid");
+    throw e;
   } finally { clearTimeout(t); }
 }
 
@@ -514,7 +522,20 @@ async function processQueue() {
       const before = { sv: card.sv, es: card.es };
       const work = { ...card, check: { ...card.check, status: "pending" } };
       try { await processCard(work, c); }
-      catch (e) { console.warn("AI-kontroll misslyckades:", e); failed = true; break; }
+      catch (e) {
+        console.warn("AI-kontroll misslyckades:", e);
+        failed = true;
+        // Visa felet på kortet i stället för att snurra för evigt, och lägg tillbaka en borttagen översättning
+        const list = activeId === id ? cards : (load(key, []) || []);
+        const target = list.find(x => x.id === work.id);
+        if (target && target.check?.status === "pending") {
+          const r = target.check.restore;
+          if (r && !target[r.side]) { target[r.side] = r.value; target.filled = r.side; target.filledBy = r.by; }
+          target.check = { status: "error", error: navigator.onLine ? String(e.message || e) : "Ingen internetanslutning" };
+          if (activeId === id) saveCards(); else save(key, list);
+        }
+        break;
+      }
       const result = { sv: work.sv, es: work.es, filled: work.filled, filledBy: work.filledBy, check: work.check };
       // Lägg in svaret på kortet som visas nu (om du inte hann ändra det under tiden)
       const list = activeId === id ? cards : (load(key, []) || []);
@@ -842,8 +863,12 @@ function askAi(list) {
   let n = 0;
   for (const c of list) {
     if (!c.sv && !c.es) continue;
-    if (c.filled && c.filledBy !== "ai" && c[c.filled === "sv" ? "es" : "sv"]) { c[c.filled] = ""; c.filled = null; c.filledBy = null; }
-    c.check = { status: "pending" };
+    let restore = null;
+    if (c.filled && c.filledBy !== "ai" && c[c.filled === "sv" ? "es" : "sv"]) {
+      restore = { side: c.filled, value: c[c.filled], by: c.filledBy };
+      c[c.filled] = ""; c.filled = null; c.filledBy = null;
+    }
+    c.check = { status: "pending", restore };
     n++;
   }
   if (!n) return;
@@ -1043,6 +1068,10 @@ function cardRow(c) {
   stats.innerHTML = `<span>Övad <b>${c.seen}</b></span><span class="ok">✓ <b>${c.right}</b></span><span class="no">✗ <b>${c.wrong}</b></span>`;
   if (c.cat && catById(c.cat) && listCat === "all") stats.append(el("span", "cat-tag", "📁 " + catLabel(c.cat)));
   if (c.check?.status === "pending") stats.append(el("span", "pend", "⏳"));
+  if (c.check?.status === "error") {
+    const er = el("span", "ai-err", "⚠ AI-fel: " + (c.check.error || "okänt fel") + " – tryck 🤖 för att försöka igen");
+    stats.append(er);
+  }
   else if (c.check?.status === "ok") stats.append(el("span", "chk", "✔︎ kontrollerad"));
 
   li.append(cols, actions, stats);

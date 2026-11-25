@@ -986,3 +986,4 @@ button.adv-label:not(.can-repeat) { opacity: .85; }
 
 /* 🤖-knappen i listan */
 .crd .actions button.ai-busy { animation: spin 1.2s linear infinite; }
+.crd .stats .ai-err { color: var(--bad-text); flex-basis: 100%; font-weight: 600; }
