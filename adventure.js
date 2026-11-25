@@ -198,7 +198,10 @@ function showAdventure(opts = {}) {
       // En figur bredvid stigen, på motsatt sida
       if (!mascotPlaced && i === 2) {
         const m = el("div", "adv-mascot" + (off >= 0 ? " left" : " right"));
-        m.append(el("span", "adv-mascot-say", ADV_CHEER[(u.idx + 2) % ADV_CHEER.length]), el("span", "adv-mascot-fig", u.mascot));
+        const fig = typeof mascotEl === "function"
+          ? mascotEl(["wave", "happy", "love", "proud", "celebrate", "idle"][u.idx % 6], "path-fig")
+          : el("span", "adv-mascot-fig", u.mascot);
+        m.append(el("span", "adv-mascot-say", ADV_CHEER[(u.idx + 2) % ADV_CHEER.length]), fig);
         wrap.append(m);
         mascotPlaced = true;
       }
@@ -285,9 +288,11 @@ function openChest(wrap, n) {
     btn.classList.remove("open"); btn.classList.add("done");
     playClass(btn, "pop");
     burst(btn, ["💎", "🪙", "✨", "⭐"], 16);
-    floatText(`+${amount} XP`, btn, "big");
+    const coins = typeof earnCoins === "function" ? earnCoins(amount) : 0;
+    floatText(`+${amount} XP` + (coins ? `  +${coins} 🪙` : ""), btn, "big");
     addBonusXP(amount);
-    toast(`🎁 Skatt! +${amount} XP`);
+    toast(`🎁 Skatt! +${amount} XP` + (coins ? ` och ${coins} 🪙` : ""));
+    if (typeof refreshMascotBits === "function") refreshMascotBits();
   }, animOn() ? 420 : 0);
 }
 
@@ -346,7 +351,7 @@ function runAdvLesson(node, unit) {
 
   const pool = advPool(), sess = practiceSession();
   const queue = [...plan], total = plan.length, isJump = node.type === "jump";
-  let cur = null, checked = false, completed = 0, firstWrong = 0, xpEarned = 0, hearts = 3;
+  let cur = null, checked = false, completed = 0, firstWrong = 0, xpEarned = 0, coinsWon = 0, hearts = 3;
   const t0 = Date.now();
   const body = $("#advBody"), checkBtn = $("#advCheck"), sheet = $("#advSheet"), bar = $("#advBar");
   let ex = null;   // aktuell övning: { ready, evaluate(), el }
@@ -609,11 +614,12 @@ function runAdvLesson(node, unit) {
     const r = ex.evaluate(), w = cur.w;
     let res = null;
     if (!ex.match) res = sess.answer(w, r.ok, ex.el, "adv", !!cur.retry);
-    if (res) xpEarned += res.gained;
+    if (res) { xpEarned += res.gained; coinsWon += res.coins || 0; }
     sheet.className = "adv-sheet show " + (r.ok ? "ok" : "bad");
     sheet.innerHTML = "";
     const head = el("div", "adv-sheet-head");
     head.append(el("span", "adv-sheet-icon", r.ok ? "✓" : "✗"), el("b", "", r.ok ? ADV_PRAISE[Math.floor(Math.random() * ADV_PRAISE.length)] : "Inte riktigt"));
+    if (typeof mascotMini === "function") head.append(mascotMini(r.ok ? (r.almost ? "happy" : mPick(["happy", "love", "celebrate"])) : mPick(["sad", "shock"])));
     sheet.append(head);
     if (r.ok && r.almost) sheet.append(el("div", "adv-sheet-text", `Tänk på accenterna: ${r.correct}`));
     if (!r.ok && r.correct) {
@@ -677,7 +683,13 @@ function runAdvLesson(node, unit) {
       if (!was) announceAch(addTotal(node.type === "check" ? "advChecks" : "advLessons"));
     }
     advSave(st);
+    if (node.type !== "jump") {   // räknas för dagens utmaningar
+      const days = getDays(), dk = todayKey(); days[dk] = days[dk] || { n: 0, xp: 0 };
+      days[dk].adv = (days[dk].adv || 0) + 1; save("app.days", days);
+    }
+    if (typeof earnCoins === "function") coinsWon += earnCoins(Math.ceil(bonus / 2));
     addBonusXP(bonus);
+    if (typeof mReconcile === "function") coinsWon += mReconcile();
     xpEarned += bonus;
 
     render("tpl-adv-done", "adv-done");
@@ -690,6 +702,7 @@ function runAdvLesson(node, unit) {
     playClass(big, "bounce-in");
     setTimeout(() => burst(big, ["🎉", "⭐", "✨", "🎊", "💛"], 22), 250);
     const tiles = [["TOTAL XP", xpEarned, "⚡", "xp"], ["TRÄFFSÄKERHET", acc + " %", "🎯", "acc"], ["TID", `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`, "⏱", "time"]];
+    if (coinsWon) tiles.push(["MYNT", coinsWon, "🪙", "coins"]);
     const box = $("#advDoneStats");
     tiles.forEach(([lab, val, icon, cls], i) => {
       const d = el("div", "adv-done-tile " + cls);

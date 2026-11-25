@@ -261,7 +261,13 @@ function awardPractice(key, ok, box, opt = {}) {
 
   // Dagens siffror (för streak, dagsmål och XP-kursen)
   const days = getDays(), k = todayKey(), d = days[k] || { n: 0, xp: 0 };
+  const firstToday = !d.n;
   d.n++; d.xp += gained;
+  // Mer detaljer för dagens utmaningar (mascot.js)
+  if (ok) d.ok = (d.ok || 0) + 1;
+  d.cb = Math.max(d.cb || 0, combo);
+  if (mastered) d.ms = (d.ms || 0) + 1;
+  if (ok && ["write", "mc", "listen", "speak", "verbs", "adv"].includes(mode)) d["m_" + mode] = (d["m_" + mode] || 0) + 1;
   let goalReached = false;
   if (!d.goalHit && d.n >= getGoal()) { d.goalHit = true; goalReached = true; }
   days[k] = d; save("app.days", days);
@@ -281,7 +287,9 @@ function awardPractice(key, ok, box, opt = {}) {
 
   const levelUp = addXP(gained);
   const newAch = checkAchievements();
-  return { gained, mastered, levelUp, goalReached, newAch };
+  // Mynt och maskotens reaktioner (mascot.js)
+  const extra = typeof mascotAward === "function" ? mascotAward({ ok, mult, mastered, goalReached, firstToday }) : {};
+  return { gained, mastered, levelUp, goalReached, newAch, coins: extra.coins || 0 };
 }
 
 // ---------- Märken ----------
@@ -616,6 +624,7 @@ function render(tplId, name) {
   document.body.classList.remove("login-mode");
   if (typeof onViewChange === "function") onViewChange(name);
   currentView = name;
+  if (typeof mascotViewChange === "function") mascotViewChange(name);
 }
 function $(sel) { return view.querySelector(sel); }
 function el(tag, cls, text) {
@@ -701,7 +710,7 @@ function floatText(text, from, cls = "") {
 // Visar XP-belöningen efter ett svar: +XP, firande vid fullt inlärt kort och ny nivå
 function showXP(res, from) {
   if (!res) return;
-  floatText(`+${res.gained} XP`, from, res.mastered ? "big" : "");
+  floatText(`+${res.gained} XP` + (res.coins ? `  +${res.coins} 🪙` : ""), from, res.mastered ? "big" : "");
   if (res.mastered) {
     toast(`🏆 Fullt inlärt! +${XP_MASTER} XP`);
     burst(from, ["🏆", "⭐", "✨", "💎", "🎉"], 16);
@@ -718,6 +727,7 @@ function showXP(res, from) {
 }
 function announceAch(list) {
   for (const a of list || []) toast(`🏅 Nytt märke: ${a.icon} ${a.name}`);
+  if (list?.length && typeof mReconcile === "function") mReconcile();   // mynt och prylar för märket
 }
 
 function shuffle(arr) {

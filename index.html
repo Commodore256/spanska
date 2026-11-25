@@ -51,6 +51,7 @@
   <!-- Startsida -->
   <template id="tpl-home">
     <section class="home">
+      <div id="homeMascot" class="home-mascot"></div>
       <div class="stats-panel">
         <div class="level-row">
           <span id="lvlBadge" class="level-badge" title="Din nivå">1</span>
@@ -540,6 +541,7 @@
         <span class="adv-stat level" title="Nivå och XP till nästa nivå">⭐ <b id="advLevel">1</b><span class="adv-xpbar"><i id="advXPBar"></i></span></span>
         <span class="adv-stat xp" title="Total XP">⚡ <b id="advXP">0</b></span>
         <span class="adv-stat goal" title="Dagens mål">🎯 <b id="advGoal">0/20</b></span>
+        <span class="adv-stat coins" title="Mynt">🪙 <b id="advCoins">0</b></span>
       </div>
       <div id="advPath" class="adv-path"></div>
     </section>
@@ -596,6 +598,27 @@
     </section>
   </template>
 
+  <!-- Maskoten: inventory, butik och utmaningar -->
+  <template id="tpl-mascot">
+    <section class="mview">
+      <div class="m-stage">
+        <button id="mvFig" class="mascot stage-fig" title="Klappa"></button>
+        <div class="m-stage-info">
+          <button id="mvName" class="m-name" title="Byt namn"></button>
+          <div class="coin-chip big" title="Dina mynt"><span>🪙</span><b id="mvCoins">0</b></div>
+          <div id="mvSlots" class="inv-slots" aria-label="Utrustning"></div>
+        </div>
+      </div>
+      <div id="mvBuy" class="buy-bar hidden"></div>
+      <div class="chips mv-tabs" role="tablist">
+        <button class="chip active" data-tab="inv">🎒 Inventory</button>
+        <button class="chip" data-tab="shop">🛒 Butik</button>
+        <button class="chip" data-tab="chal">🎯 Utmaningar</button>
+      </div>
+      <div id="mvBody" class="mv-body"></div>
+    </section>
+  </template>
+
   <template id="tpl-done">
     <section class="done">
       <div class="big">🎉</div>
@@ -615,5 +638,6 @@
   <script src="app.js"></script>
   <script src="sync.js"></script>
   <script src="adventure.js"></script>
+  <script src="mascot.js"></script>
 </body>
 </html>

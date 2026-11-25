@@ -14,6 +14,7 @@ const FILES = [
   "./verbs.js",
   "./adventure.js",
   "./sync.js",
+  "./mascot.js",
   "./manifest.json",
   "./icons/icon.svg",
   "./icons/icon-192.png",
