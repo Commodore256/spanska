@@ -1919,15 +1919,49 @@ function dropFromQueue(queue, id) {
   for (let i = queue.length - 1; i >= 0; i--) if (queue[i].item.id === id) queue.splice(i, 1);
 }
 
+// ---------- Flashcards: vilket håll korten visas ----------
+// std = som korten är inskrivna (vänster sida först), mix = slumpat, rev = tvärtom
+const CARD_DIRS = [["std", "Standard", "Som i Mina kort"], ["mix", "Slump", "Blandat håll"], ["rev", "Tvärtom", "Andra hållet"]];
+function cardDir() { const v = load(lsKey("cardDir"), "mix"); return CARD_DIRS.some(d => d[0] === v) ? v : "mix"; }
+function cardDirShowSv(d = cardDir()) { return d === "std" ? true : d === "rev" ? false : practiceKind === "questions" ? true : Math.random() < 0.5; }
+// Tre-lägesknapp: vänster standard, mitten slump, höger tvärtom
+function cardDirSwitch(onChange) {
+  const wrap = el("div", "dir3");
+  wrap.setAttribute("role", "radiogroup"); wrap.setAttribute("aria-label", "Vilket håll flashcards visas");
+  const thumb = el("span", "dir3-thumb"); wrap.append(thumb);
+  const L = sideLabels();
+  const hint = { std: `${L.sv} → ${L.es}`, mix: "Blandat håll", rev: `${L.es} → ${L.sv}` };
+  const btns = CARD_DIRS.map(([id, name], i) => {
+    const b = el("button", "dir3-opt"); b.type = "button";
+    b.setAttribute("role", "radio"); b.dataset.i = i;
+    b.append(el("b", "", name), el("small", "", hint[id]));
+    b.onclick = () => { save(lsKey("cardDir"), id); draw(); playClass(thumb, "pop"); onChange?.(id); };
+    wrap.append(b); return b;
+  });
+  function draw() {
+    const cur = cardDir(), i = CARD_DIRS.findIndex(d => d[0] === cur);
+    wrap.style.setProperty("--pos", i);
+    btns.forEach((b, j) => { b.classList.toggle("on", j === i); b.setAttribute("aria-checked", j === i); });
+  }
+  draw();
+  return wrap;
+}
+
 function runCards(deck) {
   render("tpl-cards", "cards");
   goBack = deck.back; reopen = deck.back;
   const queue = buildSession(deck), total = queue.length;
+  queue.forEach(q => { q.showSv = cardDirShowSv(); });
   let right = 0, cur = null, flipped = false, revealed = false, busy = false, done = 0;
   const sess = practiceSession();
   const card = $("#card"), front = $("#cardFront"), back = $("#cardBack");
   const answerRow = $("#answerRow");
   const refreshTools = practiceTools(() => cur, id => { dropFromQueue(queue, id); next(); });
+  // Byt håll mitt i övningen: gäller resten av korten, och det här om det inte är vänt än
+  view.querySelector(".pbar").after(cardDirSwitch(() => {
+    queue.forEach(q => { q.showSv = cardDirShowSv(); });
+    if (cur && !revealed) { cur.showSv = cardDirShowSv(); fill(); playClass(card, "deal-in"); }
+  }));
 
   function fill() {
     const { item, showSv } = cur;
@@ -3059,6 +3093,7 @@ function showSettings() {
       processQueue();
     } catch (e) { out.textContent = "✗ Fungerade inte: " + e.message; }
   };
+  $("#cardDirBox").append(cardDirSwitch(id => toast(`🃏 Flashcards: ${CARD_DIRS.find(d => d[0] === id)[1]}`)));
   const dirSel = $("#dirSel");
   dirSel.value = load(lsKey("dir"), "mix");
   dirSel.onchange = () => save(lsKey("dir"), dirSel.value);
