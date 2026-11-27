@@ -3251,7 +3251,8 @@ function showConfigEdit(id) {
     sw.append(b);
   }
   // Ikoner att välja bland
-  const CFG_ICONS = ["🇪🇸", "🇬🇧", "🇺🇸", "🇩🇪", "🇫🇷", "🇮🇹", "🇵🇹", "🇸🇪", "🇯🇵", "🇨🇳",
+  // Flaggor för språken som brukar finnas i skolan, och Sverige
+  const CFG_ICONS = ["🇸🇪", "🇬🇧", "🇺🇸", "🇪🇸", "🇩🇪", "🇫🇷", "🇮🇹", "🇵🇹", "🇨🇳", "🇯🇵", "🇷🇺", "🇸🇦", "🇫🇮", "🇳🇴", "🇩🇰", "🇳🇱", "🇰🇷", "🇬🇷", "🇹🇷", "🇵🇱", "🇲🇽", "🇦🇷", "🇧🇷", "🇨🇦",
     "⚖️", "💼", "📊", "💰", "🏛️", "🌍", "🧪", "🔬", "🧮", "📐", "💻", "🧠", "🩺", "🎨", "🎵", "⚽", "📚", "📘", "📝", "🗣️", "🎓", "🌱", "⭐", "🚀"];
   const iconBox = $("#cfgIcons");
   const markIcon = () => iconBox.querySelectorAll(".cfg-icon-opt").forEach(b => b.classList.toggle("on", b.dataset.emoji === icon.value.trim()));
