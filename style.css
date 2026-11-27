@@ -1616,3 +1616,20 @@ button.adv-label:not(.can-repeat) { opacity: .85; }
 @media (min-width: 820px) { .mem-grid.roomy { grid-template-columns: repeat(4, 1fr); } .mem-grid.roomy .mtile { height: 160px; } }
 .mt-text { font-weight: 650; }
 .mt-text { display: block; text-align: center; width: 100%; }
+
+/* Konfig: välj ikon, och ring i konfigens färg när man håller över ett val */
+.config-edit { --cfgc: #e03131; }
+.cfg-icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); gap: 8px; margin: 8px 0 10px; }
+.cfg-icon-opt { height: 50px; display: grid; place-items: center; padding: 0; font-size: 1.6rem; line-height: 1; border-radius: 14px; cursor: pointer;
+  background: var(--card); border: 2px solid var(--border); box-shadow: 0 3px 0 var(--border); transition: transform .15s cubic-bezier(.3,1.6,.5,1), box-shadow .15s, border-color .15s; }
+.cfg-icon-opt.on { border-color: var(--cfgc); background: color-mix(in srgb, var(--cfgc) 16%, var(--card)); box-shadow: 0 3px 0 var(--cfgc); transform: scale(1.06); }
+.cfg-icon-own { display: flex; align-items: center; gap: 10px; font-size: .9rem; color: var(--muted); }
+.cfg-icon-own input { max-width: 110px; }
+.config-edit :is(input[type=text], select, .seg label, .swatch, .cfg-icon-opt, #cfgColor, .btn) { transition: box-shadow .15s, transform .15s, border-color .15s; }
+.config-edit :is(input[type=text], select, .seg label, .cfg-icon-opt, #cfgColor):hover,
+.config-edit :is(input[type=text], select):focus {
+  box-shadow: 0 0 0 3px var(--card), 0 0 0 6px var(--cfgc); border-color: var(--cfgc); outline: none; }
+.config-edit .swatch:hover { box-shadow: 0 0 0 3px var(--card), 0 0 0 6px var(--cfgc); transform: scale(1.12); }
+.config-edit .cfg-icon-opt:hover { transform: translateY(-2px) scale(1.06); }
+.config-edit .btn:hover { box-shadow: 0 0 0 3px var(--card), 0 0 0 6px var(--cfgc); }
+.config-edit .seg label:has(input:checked) { border-color: var(--cfgc); }

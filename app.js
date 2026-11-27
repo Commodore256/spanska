@@ -3250,13 +3250,31 @@ function showConfigEdit(id) {
     b.onclick = () => { colorIn.value = col; markSw(); };
     sw.append(b);
   }
-  colorIn.oninput = markSw; markSw();
+  // Ikoner att välja bland
+  const CFG_ICONS = ["🇪🇸", "🇬🇧", "🇺🇸", "🇩🇪", "🇫🇷", "🇮🇹", "🇵🇹", "🇸🇪", "🇯🇵", "🇨🇳",
+    "⚖️", "💼", "📊", "💰", "🏛️", "🌍", "🧪", "🔬", "🧮", "📐", "💻", "🧠", "🩺", "🎨", "🎵", "⚽", "📚", "📘", "📝", "🗣️", "🎓", "🌱", "⭐", "🚀"];
+  const iconBox = $("#cfgIcons");
+  const markIcon = () => iconBox.querySelectorAll(".cfg-icon-opt").forEach(b => b.classList.toggle("on", b.dataset.emoji === icon.value.trim()));
+  for (const ic of CFG_ICONS) {
+    const b = el("button", "cfg-icon-opt", ic); b.type = "button"; b.dataset.emoji = ic;
+    b.onclick = () => { icon.value = ic; markIcon(); playClass(b, "pop"); };
+    iconBox.append(b);
+  }
+  icon.addEventListener("input", markIcon);
+  // Konfigens färg används som ring när du håller över ett val
+  const section = view.querySelector(".config-edit");
+  const paintRing = () => section.style.setProperty("--cfgc", colorIn.value);
+  colorIn.oninput = () => { markSw(); paintRing(); };
+  sw.addEventListener("click", paintRing);
+  markSw(); paintRing();
+  setTimeout(markIcon, 0);
 
   // Föreslå namn och ikon när man väljer språk
   const FLAGS = { es: "🇪🇸", en: "🇬🇧", de: "🇩🇪", fr: "🇫🇷", it: "🇮🇹", pt: "🇵🇹" };
   lang.onchange = () => {
     if (!name.value || Object.values(LANGS).some(l => l.name === name.value)) name.value = LANGS[lang.value].name;
     if (!icon.value || Object.values(FLAGS).includes(icon.value)) icon.value = FLAGS[lang.value];
+    view.querySelectorAll(".cfg-icon-opt").forEach(b => b.classList.toggle("on", b.dataset.emoji === icon.value.trim()));
   };
   if (!existing) lang.onchange();
 

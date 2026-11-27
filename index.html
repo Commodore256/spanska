@@ -487,7 +487,10 @@
     <section class="config-edit">
       <h2 id="cfgTitle">Ny konfig</h2>
       <label class="field">Namn<input id="cfgName" type="text" placeholder="t.ex. Engelska eller Företagsekonomi"></label>
-      <label class="field">Ikon (emoji)<input id="cfgIcon" type="text" maxlength="8" placeholder="📘"></label>
+      <div class="field">Ikon
+        <div id="cfgIcons" class="cfg-icons" role="listbox" aria-label="Välj ikon"></div>
+        <label class="cfg-icon-own">Eller skriv en egen emoji<input id="cfgIcon" type="text" maxlength="8" placeholder="📘"></label>
+      </div>
       <div class="field">Färg <small class="muted">(syns i XP-diagrammet)</small>
         <div class="swatch-row"><span id="cfgSwatches" class="swatches"></span><input id="cfgColor" type="color" value="#e03131" title="Välj en egen färg"></div>
       </div>
