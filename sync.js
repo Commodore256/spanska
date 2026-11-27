@@ -8,7 +8,7 @@
 const SYNC_PREFIXES = ["spanska.", "cfg.", "app."];
 // Inställningar som hör till den här enheten och inte ska delas
 const SYNC_DEVICE_ONLY = new Set(["spanska.ai", "spanska.mywords", "app.theme", "app.anim", "app.chartRange",
-  "app.active", "app.advAudio", "app.advMic", "app.mGreet"]);
+  "app.active", "app.advAudio", "app.advMic", "app.mGreet", "app.chatSize"]);
 const SYNC_DEVICE_SUFFIX = [".filter", ".sort", ".listCat", ".importDraft"];
 // Vyer där det är säkert att ladda in ändringar från andra enheter (inte mitt i en övning)
 const SYNC_SAFE_VIEWS = new Set(["home", "mycards", "adv", "ach", "settings", "deck", "list", "practice", "cats", "config-edit", "import"]);

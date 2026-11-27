@@ -93,6 +93,39 @@ const chatUI = (() => {
     </form>`;
   document.body.append(fab, panel);
 
+  // Dra i kanterna för att ändra storlek, som ett fönster i Windows. Rutan sitter fast nere till höger,
+  // så den växer åt vänster och uppåt. Storleken sparas på den här enheten.
+  for (const dir of ["n", "w", "nw"]) {
+    const h = el("span", "chat-resize r-" + dir);
+    h.title = "Dra för att ändra storlek";
+    panel.append(h);
+    h.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      h.setPointerCapture(e.pointerId);
+      const r = panel.getBoundingClientRect(), sx = e.clientX, sy = e.clientY;
+      panel.classList.add("resizing");
+      const move = ev => {
+        const maxW = innerWidth - 24, maxH = innerHeight - 110;
+        if (dir.includes("w")) panel.style.width = Math.round(Math.min(maxW, Math.max(300, r.width + sx - ev.clientX))) + "px";
+        if (dir.includes("n")) panel.style.height = Math.round(Math.min(maxH, Math.max(340, r.height + sy - ev.clientY))) + "px";
+      };
+      const up = () => {
+        panel.classList.remove("resizing");
+        h.removeEventListener("pointermove", move); h.removeEventListener("pointerup", up); h.removeEventListener("pointercancel", up);
+        save("app.chatSize", { w: panel.style.width, h: panel.style.height });
+      };
+      h.addEventListener("pointermove", move); h.addEventListener("pointerup", up); h.addEventListener("pointercancel", up);
+    });
+    h.addEventListener("dblclick", () => { panel.style.width = panel.style.height = ""; save("app.chatSize", null); });
+  }
+  const savedSize = load("app.chatSize", null);
+  if (savedSize) { if (savedSize.w) panel.style.width = savedSize.w; if (savedSize.h) panel.style.height = savedSize.h; }
+  addEventListener("resize", () => {
+    const r = panel.getBoundingClientRect();
+    if (panel.style.width && r.width > innerWidth - 24) panel.style.width = (innerWidth - 24) + "px";
+    if (panel.style.height && r.height > innerHeight - 110) panel.style.height = (innerHeight - 110) + "px";
+  });
+
   const msgsEl = panel.querySelector(".chat-msgs"), input = panel.querySelector(".chat-input");
   const form = panel.querySelector(".chat-form"), sendBtn = panel.querySelector(".chat-send");
   const chips = panel.querySelector(".chat-chips"), sub = panel.querySelector(".chat-sub"), avatar = panel.querySelector(".chat-avatar");
