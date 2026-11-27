@@ -28,7 +28,8 @@
   <header class="topbar">
     <button id="btnHome" class="icon-btn" title="Tillbaka" aria-label="Tillbaka">⌂</button>
     <button id="btnMenu" class="icon-btn" title="Konfigar" aria-label="Konfigar">☰</button>
-    <h1><span id="title">¡Hola! Spanska</span> <small id="version" class="version"></small> <small id="syncState" class="sync-state"></small></h1>
+    <h1><span class="title-row"><span id="title">¡Hola! Spanska</span> <small id="version" class="version"></small> <small id="syncState" class="sync-state"></small></span>
+      <button id="cfgBadge" class="cfg-badge" type="button" title="Byt konfig"></button></h1>
     <button id="btnSettings" class="icon-btn" title="Inställningar" aria-label="Inställningar">⚙</button>
     <button id="btnFull" class="icon-btn" title="Helskärm" aria-label="Helskärm">⛶</button>
   </header>
@@ -92,6 +93,9 @@
         <span class="pm-adv-text"><b>Äventyr</b><small>Fortsätt där du var</small></span>
         <span class="pm-adv-go">▶</span>
       </button>
+      <div class="practice-row home-practice">
+        <button id="btnHomePractice" class="kd-btn play btn-practice go-blue"><span class="kd-btn-icon" data-ic="play"></span><span class="kd-btn-text"><b>Öva</b><small id="homePracticeSub">Alla dina kort</small></span><span class="kd-btn-go" data-ic="arrow"></span></button>
+      </div>
       <button id="btnMyCards" class="deck-btn mine">
         <b>📒 Mina kort</b>
         <span id="myCardsInfo" class="muted"></span>

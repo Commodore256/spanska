@@ -487,3 +487,6 @@ function klViewChange(name) {
     }
   }, 0);
 }
+
+// Första vyn ritades innan den här filen laddades – fyll i ikonerna nu
+klViewChange(currentView);

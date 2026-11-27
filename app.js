@@ -722,6 +722,7 @@ function render(tplId, name) {
   if (typeof onViewChange === "function") onViewChange(name);
   currentView = name;
   if (!KIND_KEEP_VIEWS.has(name)) practiceKind = "mixed";
+  document.getElementById("cfgBadge")?.classList.toggle("hidden", name === "home");
   if (typeof klViewChange === "function") klViewChange(name);
   if (typeof mascotViewChange === "function") mascotViewChange(name);
 }
@@ -870,6 +871,14 @@ function showHome() {
   $("#myCardsBar").dataset.w = total ? `${Math.round(100 * cards.reduce((s, c) => s + c.box, 0) / (total * MAX_BOX))}%` : "0%";
   $("#btnMyCards").onclick = showMyCards;
   $("#btnAdventure").onclick = () => showAdventure({ back: showHome });
+  // Öva direkt från startsidan, med alla kort i konfigen
+  const usableAll = cards.filter(c => c.sv && c.es);
+  $("#homePracticeSub").textContent = usableAll.length ? `${usableAll.length} kort` + (dueN ? ` · 📅 ${dueN} att repetera idag` : "") : "Lägg till kort i Mina kort först";
+  $("#btnHomePractice").onclick = () => {
+    if (!usableAll.length) { toast("Lägg till kort först"); showMyCards(); return; }
+    const homeDeck = () => ({ ...myCardsDeck(cards.filter(c => c.sv && c.es)), back: showHome, refresh: homeDeck });
+    showPracticeMenu(homeDeck());
+  };
   renderStatsPanel();
 
   const list = $("#deckList");
@@ -3476,7 +3485,25 @@ async function forceUpdate() {
 
 document.getElementById("version").textContent = "v" + APP_VERSION;
 function homeTitle() { const c = cfg(); return `${c.icon || "📘"} ${c.name}`; }
+// Topplisten får konfigens färg, och visar vilken konfig du är i
+function hexShade(hex, amt) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || ""); if (!m) return hex;
+  const n = parseInt(m[1], 16), f = v => Math.max(0, Math.min(255, Math.round(v + (amt < 0 ? v * amt : (255 - v) * amt))));
+  return "#" + [n >> 16, (n >> 8) & 255, n & 255].map(v => f(v).toString(16).padStart(2, "0")).join("");
+}
+function paintTopbar() {
+  const c = cfg(), col = cfgColor(c), bar = document.querySelector(".topbar");
+  bar.style.setProperty("--tb1", col);
+  bar.style.setProperty("--tb2", hexShade(col, -0.28));
+  bar.style.setProperty("--tb3", hexShade(col, 0.45));
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", hexShade(col, -0.1));
+  const badge = document.getElementById("cfgBadge");
+  badge.textContent = `${c.icon || "📘"} ${c.name}`;
+  badge.classList.toggle("hidden", currentView === "home");
+}
+document.getElementById("cfgBadge").onclick = () => openDrawer();
 function applyConfigUI() {
+  paintTopbar();
   document.title = `${cfg().name} v${APP_VERSION}`;
   document.body.classList.toggle("no-tts", !isLanguage());
   pickVoice();
