@@ -12,6 +12,15 @@ const CHAT_SUGGEST = [
   { icon: "🎯", title: "Förhör mig", text: "Förhör mig med 3 frågor om " }
 ];
 
+// När det redan finns ett samtal: snabbknappar som syftar på det senaste svaret och skickas direkt
+const CHAT_FOLLOW = [
+  { icon: "📝", title: "Sammanfatta", text: "Sammanfatta det där kort." },
+  { icon: "🪄", title: "Enklare", text: "Skriv det enklare." },
+  { icon: "💡", title: "Ge ett exempel", text: "Ge ett exempel." },
+  { icon: "🎯", title: "Förhör mig", text: "Förhör mig på det här med 3 frågor." },
+  { icon: "➕", title: "Förklara mer", text: "Förklara mer." }
+];
+
 function chatLoad() { return load(lsKey("chat"), []) || []; }
 function chatSave(list) { save(lsKey("chat"), list.slice(-CHAT_MAX)); }
 function chatId() { return "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -179,10 +188,12 @@ const chatUI = (() => {
   function drawChips(list) {
     chips.innerHTML = "";
     chips.classList.toggle("hidden", !list.length);
-    for (const s of CHAT_SUGGEST) {
+    // Följdfrågor om det ni precis pratade om – skickas direkt
+    for (const s of CHAT_FOLLOW) {
       const b = el("button", "chat-chip"); b.type = "button";
       b.textContent = `${s.icon} ${s.title}`;
-      b.onclick = () => { input.value = s.text; autosize(); input.focus(); };
+      b.title = `Skicka: "${s.text}"`;
+      b.onclick = () => { if (busy) return; input.value = s.text; form.requestSubmit(); };
       chips.append(b);
     }
   }
@@ -200,6 +211,7 @@ const chatUI = (() => {
     else list.forEach(m => msgsEl.append(bubbleEl(m)));
     if (busy) msgsEl.append(typingEl());
     drawChips(list);
+    input.placeholder = list.length ? "Skriv till Lía… t.ex. ”sammanfatta”" : "Skriv till Lía…";
     panel.querySelector(".chat-clear").disabled = !list.length;
     scrollDown();
   }
