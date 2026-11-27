@@ -1468,3 +1468,78 @@ button.adv-label:not(.can-repeat) { opacity: .85; }
 .mycards.picking .crd .actions, .mycards.picking .dupes-btn, .mycards.picking .kl-quick { display: none; }
 .mycards.picking .crd { grid-template-columns: 1fr; }
 .ke-kind { opacity: .86; filter: saturate(.85); }
+
+/* Linjeikoner – alltid mitt i sina rutor */
+.kl-ic { display: inline-grid; place-items: center; line-height: 1; flex: none; }
+.kl-ic svg { width: 56%; height: 56%; display: block; }
+.kl-ic.emoji { font-size: 1.6em; }
+.kl-hero-icon { font-size: 0; }
+.kl-hero-icon .kl-ic, .kl-tile-icon, .kd-btn-icon, .kl-pickbar-icon { color: #fff; }
+.kl-hero-icon > .kl-ic { width: 100%; height: 100%; }
+.kl-hero-icon .kl-ic svg { width: 46%; height: 46%; stroke-width: 2.2; }
+.kl-tile-icon svg { width: 52%; height: 52%; stroke-width: 2.2; }
+.kd-btn-icon { font-size: 0; }
+.kd-btn-icon svg { width: 52%; height: 52%; stroke-width: 2.6; }
+.kd-btn.play .kd-btn-icon svg { width: 44%; height: 44%; transform: translateX(1px); }
+.kl-new-plus { font-size: 0; }
+.kl-new-plus svg { width: 46%; height: 46%; stroke: #fff; stroke-width: 3; fill: none; stroke-linecap: round; }
+.kl-quick-go { font-size: 0; }
+.kl-quick-go svg { width: 50%; height: 50%; stroke-width: 2.6; }
+.kl-kind { padding: 3px 11px 3px 3px; }
+.kl-kind .kl-kind-ic { width: 22px; height: 22px; border-radius: 50%; }
+.kl-kind .kl-kind-ic svg { width: 62%; height: 62%; stroke-width: 2.4; }
+.kl-kind.kind-grammar .kl-kind-ic { background: #e5dbff; } .kl-kind.kind-terms .kl-kind-ic { background: #d0ebff; }
+.kl-kind.kind-questions .kl-kind-ic { background: #ffe8cc; } .kl-kind.kind-mixed .kl-kind-ic { background: #c3fae8; }
+.ke-kind-icon { width: 46px; height: 46px; border-radius: 14px; background: rgba(255,255,255,.22); box-shadow: inset 0 0 0 2px rgba(255,255,255,.3); }
+.ke-kind-icon svg { width: 54%; height: 54%; stroke-width: 2.4; }
+.ke-icon { display: grid; place-items: center; padding: 0; color: var(--text); }
+.ke-icon .kl-ic { width: 100%; height: 100%; }
+.ke-icon .kl-ic svg { width: 50%; height: 50%; }
+.ke-icon.on { color: #e67700; }
+.kl-pick { display: grid; place-items: center; padding: 0; }
+.kl-pick svg { width: 50%; height: 50%; stroke-width: 3; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+.kl-pickbar-icon { font-size: 0; }
+.kl-pickbar-icon svg { width: 52%; height: 52%; }
+.kl-pickbar-done { display: inline-flex; align-items: center; gap: 6px; }
+.kl-pickbar-done .kl-ic { width: 20px; height: 20px; }
+.kl-pickbar-done .kl-ic svg { width: 100%; height: 100%; stroke-width: 3; }
+.kd-crumbs button { display: inline-flex; align-items: center; gap: 6px; }
+.crumb-ic { width: 18px; height: 18px; } .crumb-ic svg { width: 100%; height: 100%; }
+.kd-empty-ic { width: 44px; height: 44px; border-radius: 12px; background: rgba(127,127,127,.12); }
+.kl-pm-ic { width: 42px; height: 42px; border-radius: 12px; background: rgba(255,255,255,.22); color: #fff; }
+.kl-pm-ic svg { stroke-width: 2.4; }
+
+/* Text som inte får sticka ut ur sina rutor */
+.kl-hero-text, .kl-tile, .kd-btn > span:last-child, .kl-pickbar-text, .kl-pmbanner > div, .ke-kind, .kl-quick-text, .kd-card-text > * { min-width: 0; }
+.kl-hero h2, .kl-hero p, .kl-tile-name, .kl-tile-meta, .kd-btn b, .kd-btn small, .kl-pickbar-text b, .kl-pickbar-text span,
+.ke-kind b, .ke-kind small, .ke-kind-tips, .kl-pmbanner b, .kl-pmbanner small, .kl-quick-text b, .kl-quick-text small, .kd-crumbs button span {
+  overflow-wrap: anywhere; word-break: normal; hyphens: auto; }
+.kd-btn > span:last-child { flex: 1; }
+.kl-tile .kl-kind { max-width: 100%; }
+.kl-tile .kl-kind span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kl-tile-name { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.kd-num { min-width: 0; }
+.kd-num small { display: block; line-height: 1.15; font-size: .75rem; }
+.kd-crumbs { min-width: 0; }
+.kd-crumbs button { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kd-hero-main .kl-ring.big { flex: none; }
+.ke-kind-tips { padding-left: 16px; }
+@media (max-width: 520px) {
+  .kl-hero { padding: 18px 16px; }
+  .kl-hero h2 { font-size: 1.3rem; }
+  .kl-hero-icon { width: 60px; height: 60px; border-radius: 18px; }
+  .kd-hero-main .kl-ring.big { width: 74px; height: 74px; }
+  .kd-num b { font-size: 1.3rem; }
+  .kd-btn { padding: 14px; gap: 12px; }
+}
+.pm-rec { top: 8px; right: 8px; }
+.kl-new-plus { animation: none; transition: transform .25s cubic-bezier(.3,1.6,.5,1); }
+.kl-new:hover .kl-new-plus { transform: scale(1.12) rotate(90deg); }
+.kd-h { display: flex; align-items: center; gap: 10px; }
+.kd-h-ic { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(140deg, #7950f2, #e64980); color: #fff; }
+.kd-h-ic svg { width: 55%; height: 55%; }
+.kl-tile::before { transform: rotate(-2.5deg) translate(-3px, -6px); }
+.kl-tile::after { transform: rotate(2deg) translate(4px, -4px); }
+.kl-tile:hover::before { transform: rotate(-5deg) translate(-7px, -8px); }
+.kl-tile:hover::after { transform: rotate(4.5deg) translate(8px, -6px); }
+@media (max-width: 520px) { .kl-grid.subs { grid-template-columns: 1fr 1fr; } }

@@ -100,7 +100,7 @@
       <button id="btnKortlekar" class="kl-quick home-kl">
         <span class="kl-quick-stack" aria-hidden="true"><i></i><i></i><i></i></span>
         <span class="kl-quick-text"><b>Kortlekar</b><small id="klHomeInfo">Dela upp korten i lekar och underlekar</small></span>
-        <span class="kl-quick-go">➜</span>
+        <span class="kl-quick-go" data-ic="arrow"></span>
       </button>
       <p class="lead">Färdiga övningslekar</p>
       <div id="deckList" class="deck-list"></div>
@@ -123,7 +123,7 @@
       <button id="btnToKortlekar" class="kl-quick">
         <span class="kl-quick-stack" aria-hidden="true"><i></i><i></i><i></i></span>
         <span class="kl-quick-text"><b>Kortlekar</b><small id="klMyInfo">Lekar och underlekar med dina kort</small></span>
-        <span class="kl-quick-go">➜</span>
+        <span class="kl-quick-go" data-ic="arrow"></span>
       </button>
       <form id="addForm" class="add-form" autocomplete="off">
         <div class="add-cols">
@@ -371,14 +371,14 @@
         <div id="kdNums" class="kd-nums"></div>
       </div>
       <div class="kd-actions">
-        <button id="kdPractice" class="kd-btn play"><span class="kd-btn-icon">▶</span><span><b>Öva kortleken</b><small></small></span></button>
-        <button id="kdImport" class="kd-btn import"><span class="kd-btn-icon">📥</span><span><b>Importera kort från Mina kort</b><small>Tryck ＋ vid korten du vill ha med</small></span></button>
-        <button id="kdNewSub" class="kd-btn sub"><span class="kd-btn-icon">＋</span><span><b>Ny underkortlek</b><small>Med egen typ, färg och ikon</small></span></button>
-        <button id="kdEdit" class="kd-btn edit"><span class="kd-btn-icon">✏️</span><span><b>Ändra leken</b><small>Namn, typ, färg – eller ta bort</small></span></button>
+        <button id="kdPractice" class="kd-btn play"><span class="kd-btn-icon" data-ic="play"></span><span><b>Öva kortleken</b><small></small></span></button>
+        <button id="kdImport" class="kd-btn import"><span class="kd-btn-icon" data-ic="download"></span><span><b>Importera kort från Mina kort</b><small>Välj kort med plusknappen</small></span></button>
+        <button id="kdNewSub" class="kd-btn sub"><span class="kd-btn-icon" data-ic="plus"></span><span><b>Ny underkortlek</b><small>Med egen typ, färg och ikon</small></span></button>
+        <button id="kdEdit" class="kd-btn edit"><span class="kd-btn-icon" data-ic="pen"></span><span><b>Ändra leken</b><small>Namn, typ, färg – eller ta bort</small></span></button>
       </div>
-      <h3 id="kdSubsHead" class="kd-h">🗂️ Underkortlekar</h3>
+      <h3 id="kdSubsHead" class="kd-h"><span class="kd-h-ic" data-ic="layers"></span>Underkortlekar</h3>
       <div id="kdSubs" class="kl-grid subs"></div>
-      <h3 id="kdCardsHead" class="kd-h"></h3>
+      <h3 class="kd-h"><span class="kd-h-ic" data-ic="book"></span><span id="kdCardsHead"></span></h3>
       <ul id="kdCards" class="kd-cards"></ul>
     </section>
   </template>
@@ -395,9 +395,8 @@
       <div id="keColors" class="ke-colors"></div>
       <div class="field">Ikon</div>
       <div id="keIcons" class="ke-icons"></div>
-      <label class="field ke-own">Egen ikon (emoji)<input id="keIconOwn" type="text" maxlength="8" placeholder="🦉"></label>
       <div class="ke-row">
-        <button id="keSave" class="kd-btn play ke-save"><span class="kd-btn-icon">✓</span><span><b>Spara kortleken</b></span></button>
+        <button id="keSave" class="kd-btn play ke-save"><span class="kd-btn-icon" data-ic="check"></span><span><b>Spara kortleken</b></span></button>
         <button id="keDelete" class="btn bad hidden">🗑 Ta bort</button>
       </div>
     </section>
