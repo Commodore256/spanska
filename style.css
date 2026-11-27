@@ -1160,3 +1160,49 @@ button.adv-label:not(.can-repeat) { opacity: .85; }
   .mascot.home-fig { width: 92px; height: 114px; }
 }
 .adv-done-tile.coins { border-color: #f59f00; } .adv-done-tile.coins small { background: #f59f00; }
+
+/* XP-diagrammet: flera konfiger, håll in för att se en dag */
+.ticker, .tk-chart, .tk-chart * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.tk-table { -webkit-user-select: text; user-select: text; }
+.tk-chart svg { touch-action: pan-y; cursor: crosshair; outline: none; }
+.tk-grid.base { stroke: var(--muted); opacity: .5; }
+.tk-pt { transition: r .15s; }
+.tk-tip { z-index: 3; align-items: stretch; gap: 1px; padding: 8px 12px; min-width: 150px; }
+.tk-tip .tk-tip-day { font-weight: 700; opacity: 1; }
+.tk-tip > b { font-size: 1.2rem; }
+.tk-tip-rows { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.2); }
+.tk-tip-row { display: grid; grid-template-columns: 10px 1fr auto; column-gap: 6px; align-items: center; font-size: .8rem; }
+.tk-tip-row i { width: 10px; height: 10px; border-radius: 50%; }
+.tk-tip-row b { font-size: .85rem; }
+.tk-tip-row small { grid-column: 2 / 4; margin-top: -2px; }
+.tk-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tk-leg { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 2px solid var(--border);
+  background: var(--card); color: var(--text); font: inherit; font-size: .85rem; cursor: pointer; }
+.tk-leg i { width: 12px; height: 12px; border-radius: 50%; }
+.tk-leg small { color: var(--muted); }
+.tk-leg.off { opacity: .45; } .tk-leg.off i { background: var(--muted) !important; }
+.tk-hint { margin: 6px 0 0; }
+.tk-empty { position: absolute; inset: 40% 0 auto; }
+.ticker { padding: 16px; }
+
+/* Färgval för konfig */
+.swatch-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+.swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+.swatch { width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--card); box-shadow: 0 0 0 2px var(--border); cursor: pointer; padding: 0; }
+.swatch.on { box-shadow: 0 0 0 3px var(--text); }
+#cfgColor { width: 44px; height: 34px; padding: 0; border: 2px solid var(--border); border-radius: 8px; background: none; cursor: pointer; }
+
+/* Nollställ i inställningar och fråga-rutan */
+.danger-row { border: 2px solid rgba(192,57,43,.35); border-radius: 12px; padding: 10px 12px; }
+.btn-small.bad { background: var(--bad); color: #fff; border-color: var(--bad); }
+.cdlg-bg { position: fixed; inset: 0; z-index: 950; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; padding: 16px; opacity: 0; transition: opacity .18s; }
+.cdlg-bg.show { opacity: 1; }
+.cdlg { background: var(--card); color: var(--text); border-radius: 20px; padding: 22px; max-width: 380px; width: 100%; text-align: center;
+  box-shadow: 0 12px 40px rgba(0,0,0,.35); transform: scale(.92); transition: transform .2s; }
+.cdlg-bg.show .cdlg { transform: none; }
+.cdlg.danger { border: 3px solid var(--bad); }
+.cdlg-icon { font-size: 2.6rem; }
+.cdlg h3 { margin: 6px 0; }
+.cdlg p { color: var(--muted); margin: 0 0 16px; }
+.cdlg-row { display: flex; gap: 10px; }
+.cdlg-row .btn { flex: 1; }

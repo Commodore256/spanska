@@ -224,6 +224,38 @@ function todayKey(d = new Date()) {
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
 function getDays() { return load("app.days", {}) || {}; }
+// Dagens siffror per konfig (för XP-diagrammet): d.c = { <konfig-id>: { xp, n, ms } }
+function addDayCfg(d, { xp = 0, n = 0, ms = 0 }) {
+  d.c = d.c || {};
+  const c = d.c[activeId] = d.c[activeId] || { xp: 0, n: 0, ms: 0 };
+  c.xp += xp; c.n += n; c.ms += ms;
+}
+// Färgen för en konfig i diagrammet
+const CFG_COLORS = ["#e03131", "#1c7ed6", "#2f9e44", "#f08c00", "#9c36b5", "#0c8599", "#e64980", "#5c940d"];
+function cfgColor(c) {
+  if (c?.color) return c.color;
+  const i = Math.max(0, configs.findIndex(x => x.id === c?.id));
+  return CFG_COLORS[i % CFG_COLORS.length];
+}
+// Egen fråga-ruta (i stället för webbläsarens confirm). Returnerar ett Promise<boolean>.
+function confirmDialog({ title, text, ok = "Ja", cancel = "Avbryt", danger = false, icon = "⚠️" }) {
+  return new Promise(resolve => {
+    const bg = el("div", "cdlg-bg"), box = el("div", "cdlg" + (danger ? " danger" : ""));
+    box.setAttribute("role", "alertdialog"); box.setAttribute("aria-modal", "true");
+    box.append(el("div", "cdlg-icon", icon), el("h3", "", title));
+    if (text) box.append(el("p", "", text));
+    const row = el("div", "cdlg-row");
+    const no = el("button", "btn secondary", cancel), yes = el("button", "btn " + (danger ? "bad" : "good"), ok);
+    row.append(no, yes); box.append(row); bg.append(box); document.body.append(bg);
+    requestAnimationFrame(() => bg.classList.add("show"));
+    const done = v => { bg.classList.remove("show"); document.removeEventListener("keydown", key); setTimeout(() => bg.remove(), 200); resolve(v); };
+    const key = e => { if (e.key === "Escape") done(false); };
+    document.addEventListener("keydown", key);
+    no.onclick = () => done(false); yes.onclick = () => done(true);
+    bg.onclick = e => { if (e.target === bg) done(false); };
+    no.focus();
+  });
+}
 function getGoal() { return Math.max(1, Math.min(500, Number(load("app.goal", 20)) || 20)); }
 function todayCount() { return getDays()[todayKey()]?.n || 0; }
 function currentStreak() {
@@ -268,6 +300,7 @@ function awardPractice(key, ok, box, opt = {}) {
   d.cb = Math.max(d.cb || 0, combo);
   if (mastered) d.ms = (d.ms || 0) + 1;
   if (ok && ["write", "mc", "listen", "speak", "verbs", "adv"].includes(mode)) d["m_" + mode] = (d["m_" + mode] || 0) + 1;
+  addDayCfg(d, { xp: gained, n: 1, ms: mastered ? 1 : 0 });
   let goalReached = false;
   if (!d.goalHit && d.n >= getGoal()) { d.goalHit = true; goalReached = true; }
   days[k] = d; save("app.days", days);
@@ -799,13 +832,7 @@ function showHome() {
   view.querySelectorAll(".bar > i").forEach(i => { if (!i.dataset.w) { i.dataset.w = i.style.width || "0%"; } i.style.width = "0%"; });
   requestAnimationFrame(() => requestAnimationFrame(() => view.querySelectorAll(".bar > i").forEach(i => { i.style.width = i.dataset.w; })));
   $("#btnUpdate").onclick = forceUpdate;
-  $("#btnReset").onclick = () => {
-    if (!confirm("Vill du nollställa all progress? Dina kort finns kvar, men nivåerna och räknarna (övade / fullt inlärda) nollas. Din XP och nivå finns kvar.")) return;
-    progress = {}; save(lsKey("progress"), progress);
-    stats = { studied: {}, mastered: {} }; save(lsKey("stats"), stats);
-    cards.forEach(c => { c.box = 0; c.seen = 0; c.right = 0; c.wrong = 0; c.lastSeen = 0; });
-    saveCards(); showHome();
-  };
+
 }
 
 // Panelen överst på startsidan: nivå, XP och räknare
@@ -2359,6 +2386,8 @@ const SV_MONTHS = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep"
 const SV_DAYS = ["sön", "mån", "tis", "ons", "tors", "fre", "lör"];
 function dateLabel(d, withDay = false) { return (withDay ? SV_DAYS[d.getDay()] + " " : "") + d.getDate() + " " + SV_MONTHS[d.getMonth()]; }
 
+// Siffror per dag, både totalt och per konfig.
+// Dagar från innan konfig-uppdelningen fanns räknas till Spanska (eller den första konfigen).
 function xpSeries(range) {
   const days = getDays(), keys = Object.keys(days).sort();
   let n = range === "all" ? 7 : Number(range);
@@ -2366,11 +2395,19 @@ function xpSeries(range) {
     const first = new Date(keys[0] + "T12:00:00");
     n = Math.max(7, Math.round((Date.now() - first) / 86400000) + 1);
   }
+  const legacy = (configs.find(c => c.id === "spanska") || configs[0]).id;
   const out = [];
   for (let i = n - 1; i >= 0; i--) {
     const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - i);
-    const v = days[todayKey(d)] || {};
-    out.push({ date: d, xp: v.xp || 0, n: v.n || 0 });
+    const v = days[todayKey(d)] || {}, per = {};
+    for (const [id, c] of Object.entries(v.c || {})) per[id] = { xp: c.xp || 0, n: c.n || 0, ms: c.ms || 0 };
+    const sum = k => Object.values(per).reduce((t, c) => t + c[k], 0);
+    const rest = { xp: Math.max(0, (v.xp || 0) - sum("xp")), n: Math.max(0, (v.n || 0) - sum("n")), ms: Math.max(0, (v.ms || 0) - sum("ms")) };
+    if (rest.xp || rest.n || rest.ms) {
+      const t = per[legacy] = per[legacy] || { xp: 0, n: 0, ms: 0 };
+      t.xp += rest.xp; t.n += rest.n; t.ms += rest.ms;
+    }
+    out.push({ date: d, xp: v.xp || 0, n: v.n || 0, ms: v.ms || 0, per });
   }
   return out;
 }
@@ -2423,7 +2460,8 @@ function showAch() {
   });
 }
 
-// Aktie-liknande diagram över XP per dag
+// Aktie-liknande diagram över XP per dag – en färgad linje per konfig
+let tkHidden = new Set();   // konfiger du har släckt i förklaringen
 function drawTicker(range) {
   const data = xpSeries(range), box = $("#tkChart");
   const today = data[data.length - 1].xp, yest = data.length > 1 ? data[data.length - 2].xp : 0;
@@ -2433,90 +2471,152 @@ function drawTicker(range) {
   ch.textContent = (diff > 0 ? "▲ +" : diff < 0 ? "▼ " : "■ ") + diff + " XP" +
     (yest ? ` (${diff >= 0 ? "+" : ""}${Math.round(100 * diff / yest)} %)` : "") + " mot igår";
 
+  // Vilka konfiger som syns: de som finns, plus de som har XP i perioden
+  const series = configs.map(c => ({ c, color: cfgColor(c), total: data.reduce((t, p) => t + (p.per[c.id]?.xp || 0), 0) }));
+  const shown = series.filter(s => !tkHidden.has(s.c.id));
+
   // Tabell (samma siffror utan diagram)
   const table = $("#tkTable");
-  table.innerHTML = "<thead><tr><th>Dag</th><th>XP</th><th>Kort</th></tr></thead>";
+  table.innerHTML = "<thead><tr><th>Dag</th><th>XP</th><th>Kort övade</th><th>Inlärda</th></tr></thead>";
   const tb = el("tbody");
   for (const p of [...data].reverse()) {
     const tr = el("tr");
-    tr.append(el("td", "", dateLabel(p.date, true)), el("td", "", String(p.xp)), el("td", "", String(p.n)));
+    tr.append(el("td", "", dateLabel(p.date, true)), el("td", "", String(p.xp)), el("td", "", String(p.n)), el("td", "", String(p.ms)));
     tb.append(tr);
   }
   table.append(tb);
 
+  // Förklaring: tryck för att visa/dölja en konfig
+  const leg = $("#tkLegend");
+  leg.innerHTML = "";
+  if (series.length > 1) {
+    for (const s of series) {
+      const b = el("button", "tk-leg" + (tkHidden.has(s.c.id) ? " off" : ""));
+      b.title = tkHidden.has(s.c.id) ? "Visa i diagrammet" : "Dölj i diagrammet";
+      const dot = el("i"); dot.style.background = s.color;
+      b.append(dot, el("span", "", `${s.c.icon || ""} ${s.c.name}`), el("small", "", `${s.total} XP`));
+      b.onclick = () => { tkHidden.has(s.c.id) ? tkHidden.delete(s.c.id) : tkHidden.add(s.c.id); drawTicker(range); };
+      leg.append(b);
+    }
+  }
+
   // SVG
-  const W = Math.max(280, box.clientWidth || 340), H = 190, pl = 34, pr = 10, pt = 12, pb = 24;
-  const max = Math.max(10, ...data.map(p => p.xp));
+  const W = Math.max(300, box.clientWidth || 340), H = 250, pl = 36, pr = 12, pt = 16, pb = 26;
+  const max = Math.max(10, ...data.flatMap(p => shown.map(s => p.per[s.c.id]?.xp || 0)));
   const step = Math.pow(10, Math.floor(Math.log10(max)));
   const top = Math.ceil(max / step) * step;
   const x = i => pl + (data.length === 1 ? (W - pl - pr) / 2 : i * (W - pl - pr) / (data.length - 1));
   const y = v => pt + (H - pt - pb) * (1 - v / top);
-  const up = data[data.length - 1].xp >= data[0].xp;
-  const color = up ? "var(--good)" : "var(--bad)";
   const ns = "http://www.w3.org/2000/svg";
   const mk = (tag, attrs) => { const e = document.createElementNS(ns, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
   const svg = mk("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: "img",
-    "aria-label": `XP per dag, senaste ${data.length} dagarna. Idag ${today} XP.` });
-  const defs = mk("defs", {}), grad = mk("linearGradient", { id: "tkGrad", x1: 0, y1: 0, x2: 0, y2: 1 });
-  grad.append(mk("stop", { offset: "0%", "stop-color": up ? "#27ae60" : "#c0392b", "stop-opacity": 0.28 }),
-              mk("stop", { offset: "100%", "stop-color": up ? "#27ae60" : "#c0392b", "stop-opacity": 0 }));
-  defs.append(grad); svg.append(defs);
+    "aria-label": `XP per dag och konfig, senaste ${data.length} dagarna. Idag ${today} XP totalt.` });
   // rutnät och y-etiketter
-  for (const v of [0, top / 2, top]) {
-    svg.append(mk("line", { x1: pl, x2: W - pr, y1: y(v), y2: y(v), class: "tk-grid" }));
-    const lab = mk("text", { x: pl - 6, y: y(v) + 4, class: "tk-axis", "text-anchor": "end" }); lab.textContent = Math.round(v); svg.append(lab);
+  for (const v of [0, top / 4, top / 2, top * 3 / 4, top]) {
+    svg.append(mk("line", { x1: pl, x2: W - pr, y1: y(v), y2: y(v), class: "tk-grid" + (v ? "" : " base") }));
+    if (v === 0 || v === top / 2 || v === top) {
+      const lab = mk("text", { x: pl - 6, y: y(v) + 4, class: "tk-axis", "text-anchor": "end" }); lab.textContent = Math.round(v); svg.append(lab);
+    }
   }
   // x-etiketter: första, mitten, sista
   const idxs = [...new Set([0, Math.floor((data.length - 1) / 2), data.length - 1])];
   for (const i of idxs) {
-    const lab = mk("text", { x: x(i), y: H - 6, class: "tk-axis", "text-anchor": i === 0 ? "start" : i === data.length - 1 ? "end" : "middle" });
+    const lab = mk("text", { x: x(i), y: H - 7, class: "tk-axis", "text-anchor": i === 0 ? "start" : i === data.length - 1 ? "end" : "middle" });
     lab.textContent = i === data.length - 1 ? "idag" : dateLabel(data[i].date); svg.append(lab);
   }
-  const pts = data.map((p, i) => `${x(i).toFixed(1)},${y(p.xp).toFixed(1)}`);
-  svg.append(mk("path", { d: `M${x(0)},${y(0)} L${pts.join(" L")} L${x(data.length - 1)},${y(0)} Z`, fill: "url(#tkGrad)" }));
-  const line = mk("polyline", { points: pts.join(" "), fill: "none", stroke: color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round", class: "tk-line" });
-  svg.append(line);
-  svg.append(mk("circle", { cx: x(data.length - 1), cy: y(today), r: 4.5, fill: color, stroke: "var(--card)", "stroke-width": 2 }));
-  // hovring: hårkors och etikett
   const cross = mk("line", { y1: pt, y2: H - pb, class: "tk-cross", visibility: "hidden" });
-  const dot = mk("circle", { r: 5, fill: color, stroke: "var(--card)", "stroke-width": 2, visibility: "hidden" });
-  svg.append(cross, dot);
+  svg.append(cross);
+  // En linje och en punkt per dag för varje konfig
+  const r = data.length <= 31 ? 4 : data.length <= 92 ? 2.6 : 0;
+  const lines = [], dotGroups = [];
+  for (const s of shown) {
+    const pts = data.map((p, i) => `${x(i).toFixed(1)},${y(p.per[s.c.id]?.xp || 0).toFixed(1)}`);
+    if (shown.length === 1) {
+      const gid = "tkGrad" + s.c.id.replace(/[^a-z0-9]/gi, "");
+      const grad = mk("linearGradient", { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 });
+      grad.append(mk("stop", { offset: "0%", "stop-color": s.color, "stop-opacity": 0.25 }), mk("stop", { offset: "100%", "stop-color": s.color, "stop-opacity": 0 }));
+      const defs = mk("defs", {}); defs.append(grad); svg.append(defs);
+      svg.append(mk("path", { d: `M${x(0)},${y(0)} L${pts.join(" L")} L${x(data.length - 1)},${y(0)} Z`, fill: `url(#${gid})` }));
+    }
+    const line = mk("polyline", { points: pts.join(" "), fill: "none", stroke: s.color, "stroke-width": 2.2, "stroke-linejoin": "round", "stroke-linecap": "round", class: "tk-line" });
+    svg.append(line); lines.push(line);
+    const g = mk("g", {});
+    if (r) data.forEach((p, i) => g.append(mk("circle", { cx: x(i), cy: y(p.per[s.c.id]?.xp || 0), r, fill: s.color, stroke: "var(--card)", "stroke-width": 1.5, class: "tk-pt" })));
+    svg.append(g); dotGroups.push(g);
+  }
+  // Markerade punkter för vald dag
+  const marks = shown.map(s => { const m = mk("circle", { r: 6.5, fill: s.color, stroke: "var(--card)", "stroke-width": 2.5, visibility: "hidden" }); svg.append(m); return m; });
   box.innerHTML = ""; box.append(svg);
   const tip = el("div", "tk-tip hidden"); box.append(tip);
-  const hit = mk("rect", { x: pl, y: 0, width: W - pl - pr, height: H, fill: "transparent", tabindex: 0 });
-  svg.append(hit);
+  if (!shown.length) { const e = el("p", "muted center tk-empty", "Alla konfiger är dolda – tryck på en i listan under."); box.append(e); }
+
   let cur = data.length - 1;
   const showAt = i => {
     cur = Math.max(0, Math.min(data.length - 1, i));
     const p = data[cur];
     cross.setAttribute("x1", x(cur)); cross.setAttribute("x2", x(cur)); cross.setAttribute("visibility", "visible");
-    dot.setAttribute("cx", x(cur)); dot.setAttribute("cy", y(p.xp)); dot.setAttribute("visibility", "visible");
+    shown.forEach((s, j) => { marks[j].setAttribute("cx", x(cur)); marks[j].setAttribute("cy", y(p.per[s.c.id]?.xp || 0)); marks[j].setAttribute("visibility", "visible"); });
     tip.textContent = "";
-    tip.append(el("b", "", `${p.xp} XP`), el("small", "", `${dateLabel(p.date, true)} · ${p.n} kort`));
+    tip.append(el("small", "tk-tip-day", dateLabel(p.date, true) + (cur === data.length - 1 ? " (idag)" : "")),
+      el("b", "", `${p.xp} XP`), el("small", "", `${p.n} kort övade · ${p.ms} inlärda`));
+    const rows = series.filter(s => p.per[s.c.id] && (p.per[s.c.id].xp || p.per[s.c.id].n));
+    if (rows.length && series.length > 1) {
+      const list = el("div", "tk-tip-rows");
+      for (const s of rows) {
+        const v = p.per[s.c.id], row = el("div", "tk-tip-row"), dot = el("i"); dot.style.background = s.color;
+        row.append(dot, el("span", "", `${s.c.icon || ""} ${s.c.name}`), el("b", "", `${v.xp} XP`), el("small", "", `${v.n} kort${v.ms ? ` · ${v.ms} inlärda` : ""}`));
+        list.append(row);
+      }
+      tip.append(list);
+    }
+    if (!p.n && !p.xp) tip.append(el("small", "", "Ingen övning den dagen"));
     tip.classList.remove("hidden");
-    const r = svg.getBoundingClientRect(), sx = r.width / W;
-    tip.style.left = Math.min(Math.max(x(cur) * sx, 50), r.width - 50) + "px";
-    tip.style.top = Math.max(0, y(p.xp) * sx - 48) + "px";
+    const rect = svg.getBoundingClientRect(), sx = rect.width / W, tw = tip.offsetWidth || 160;
+    const px = x(cur) * sx;
+    // Rutan hamnar bredvid punkten, så att fingret inte täcker den
+    tip.style.left = Math.min(Math.max(px + (px > rect.width / 2 ? -tw / 2 - 18 : tw / 2 + 18), tw / 2), rect.width - tw / 2) + "px";
+    tip.style.top = "4px";
   };
-  const hide = () => { cross.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); tip.classList.add("hidden"); };
-  hit.addEventListener("pointermove", e => {
-    const r = svg.getBoundingClientRect(), px = (e.clientX - r.left) * (W / r.width);
-    showAt(Math.round((px - pl) / ((W - pl - pr) / Math.max(1, data.length - 1))));
+  const hide = () => { cross.setAttribute("visibility", "hidden"); marks.forEach(m => m.setAttribute("visibility", "hidden")); tip.classList.add("hidden"); };
+  const idxAt = e => {
+    const rect = svg.getBoundingClientRect(), px = (e.clientX - rect.left) * (W / rect.width);
+    return Math.round((px - pl) / ((W - pl - pr) / Math.max(1, data.length - 1)));
+  };
+  // Mus: visa när du håller över. Finger/penna: håll in, dra för att byta dag.
+  let holding = false, hideT = null;
+  svg.addEventListener("pointerdown", e => {
+    holding = true; clearTimeout(hideT);
+    try { svg.setPointerCapture(e.pointerId); } catch { /* ignorera */ }
+    showAt(idxAt(e));
+    if (navigator.vibrate && e.pointerType === "touch") navigator.vibrate(8);
   });
-  hit.addEventListener("pointerleave", hide);
-  hit.addEventListener("focus", () => showAt(cur));
-  hit.addEventListener("blur", hide);
-  hit.addEventListener("keydown", e => {
+  svg.addEventListener("pointermove", e => {
+    if (holding || e.pointerType === "mouse") { clearTimeout(hideT); showAt(idxAt(e)); }
+  });
+  const release = e => {
+    holding = false;
+    clearTimeout(hideT);
+    hideT = setTimeout(hide, e.pointerType === "mouse" ? 1500 : 3500);
+  };
+  svg.addEventListener("pointerup", release);
+  svg.addEventListener("pointercancel", release);
+  svg.addEventListener("pointerleave", e => { if (e.pointerType === "mouse" && !holding) hide(); });
+  svg.addEventListener("contextmenu", e => e.preventDefault());
+  svg.setAttribute("tabindex", 0);
+  svg.addEventListener("focus", () => showAt(cur));
+  svg.addEventListener("blur", hide);
+  svg.addEventListener("keydown", e => {
     if (e.key === "ArrowLeft") { e.preventDefault(); showAt(cur - 1); }
     if (e.key === "ArrowRight") { e.preventDefault(); showAt(cur + 1); }
   });
-  // linjen ritas fram
-  if (animOn() && line.getTotalLength) {
+  // linjerna ritas fram
+  if (animOn()) lines.forEach(line => {
+    if (!line.getTotalLength) return;
     const L = line.getTotalLength();
     line.style.strokeDasharray = L; line.style.strokeDashoffset = L;
     line.getBoundingClientRect();
     line.style.transition = "stroke-dashoffset 1s ease-out"; line.style.strokeDashoffset = 0;
-  }
+  });
 }
 
 // =====================================================================
@@ -2555,6 +2655,21 @@ function showSettings() {
     document.documentElement.dataset.anim = anim.checked ? "on" : "off";
     save("app.anim", anim.checked ? "on" : "off");
     if (anim.checked) burst(anim.closest(".setting-row"), ["✨", "⭐", "🎉"], 10);
+  };
+
+  const c0 = cfg();
+  $("#resetWhat").textContent = `Nollställer nivåerna och räknarna för ${c0.icon || ""} ${c0.name}.`;
+  $("#btnReset").onclick = async () => {
+    const yes = await confirmDialog({
+      title: `Nollställa progress för ${c0.name}?`, icon: "🗑️", danger: true, ok: "Ja, nollställ", cancel: "Nej, behåll",
+      text: "Alla kortens nivåer och räknarna (övade / fullt inlärda) börjar om från noll. Dina kort, din XP, din nivå, dina mynt och märken finns kvar. Det går inte att ångra."
+    });
+    if (!yes) return;
+    progress = {}; save(lsKey("progress"), progress);
+    stats = { studied: {}, mastered: {} }; save(lsKey("stats"), stats);
+    cards.forEach(c => { c.box = 0; c.seen = 0; c.right = 0; c.wrong = 0; c.lastSeen = 0; });
+    saveCards();
+    toast("🗑️ Progressen är nollställd");
   };
 
   const ai = aiConfig();
@@ -2646,6 +2761,7 @@ function showConfigEdit(id) {
     name.value = existing.name; icon.value = existing.icon || "";
     lang.value = existing.lang || "es";
     front.value = existing.front || ""; back.value = existing.back || "";
+    $("#cfgColor").value = cfgColor(existing);
     setType(existing.type || "language");
     // Typen och språket kan inte ändras när det redan finns kort (de skulle bli fel)
     if ((load(keyFor(existing.id, "cards"), []) || []).length) {
@@ -2654,7 +2770,19 @@ function showConfigEdit(id) {
       $("#cfgLocked").classList.remove("hidden");
     }
     if (configs.length > 1) $("#btnDeleteCfg").classList.remove("hidden");
-  } else setType("language");
+  } else {
+    setType("language");
+    $("#cfgColor").value = CFG_COLORS.find(col => !configs.some(c => cfgColor(c) === col)) || CFG_COLORS[configs.length % CFG_COLORS.length];
+  }
+  // Färgrutor att välja bland
+  const sw = $("#cfgSwatches"), colorIn = $("#cfgColor");
+  const markSw = () => sw.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.c.toLowerCase() === colorIn.value.toLowerCase()));
+  for (const col of CFG_COLORS) {
+    const b = el("button", "swatch"); b.type = "button"; b.dataset.c = col; b.style.background = col; b.title = col;
+    b.onclick = () => { colorIn.value = col; markSw(); };
+    sw.append(b);
+  }
+  colorIn.oninput = markSw; markSw();
 
   // Föreslå namn och ikon när man väljer språk
   const FLAGS = { es: "🇪🇸", en: "🇬🇧", de: "🇩🇪", fr: "🇫🇷", it: "🇮🇹", pt: "🇵🇹" };
@@ -2672,7 +2800,8 @@ function showConfigEdit(id) {
       name: n, icon: icon.value.trim() || (type === "language" ? FLAGS[lang.value] : "📚"), type,
       lang: type === "language" ? lang.value : undefined,
       front: type === "subject" ? (front.value.trim() || "Begrepp") : undefined,
-      back: type === "subject" ? (back.value.trim() || "Förklaring") : undefined
+      back: type === "subject" ? (back.value.trim() || "Förklaring") : undefined,
+      color: $("#cfgColor").value
     };
     if (existing) {
       Object.assign(existing, data);

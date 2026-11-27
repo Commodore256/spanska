@@ -34,7 +34,7 @@ function advMicOn() { return load("app.advMic", "on") !== "off" && isLanguage() 
 // Bonus-XP (lektion klar, kistor): räknas in i dagens XP men inte som ett svar
 function addBonusXP(n) {
   const days = getDays(), k = todayKey(), d = days[k] || { n: 0, xp: 0 };
-  d.xp += n; days[k] = d; save("app.days", days);
+  d.xp += n; addDayCfg(d, { xp: n }); days[k] = d; save("app.days", days);
   const lvl = addXP(n);
   if (lvl) {
     toast(`⭐ Ny nivå: ${lvl}!`);

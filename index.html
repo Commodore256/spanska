@@ -101,7 +101,6 @@
       <div id="deckList" class="deck-list"></div>
       <div class="home-actions">
         <button id="btnUpdate" class="btn ghost">🔄 Uppdatera appen</button>
-        <button id="btnReset" class="btn ghost">Nollställ progress</button>
       </div>
     </section>
   </template>
@@ -333,6 +332,11 @@
         <option value="sv2es" id="optSv2Es">Svenska → målspråket</option>
         <option value="es2sv" id="optEs2Sv">Målspråket → svenska</option>
       </select>
+      <h2>Nollställ</h2>
+      <div class="setting-row danger-row">
+        <span class="setting-text"><b>🗑️ Nollställ progress</b><small id="resetWhat" class="muted"></small></span>
+        <button id="btnReset" class="btn-small bad">Nollställ…</button>
+      </div>
     </section>
   </template>
 
@@ -353,6 +357,9 @@
       <h2 id="cfgTitle">Ny konfig</h2>
       <label class="field">Namn<input id="cfgName" type="text" placeholder="t.ex. Engelska eller Företagsekonomi"></label>
       <label class="field">Ikon (emoji)<input id="cfgIcon" type="text" maxlength="8" placeholder="📘"></label>
+      <div class="field">Färg <small class="muted">(syns i XP-diagrammet)</small>
+        <div class="swatch-row"><span id="cfgSwatches" class="swatches"></span><input id="cfgColor" type="color" value="#e03131" title="Välj en egen färg"></div>
+      </div>
       <div class="field">Typ
         <div class="seg">
           <label><input type="radio" name="cfgType" value="language" checked> 🌍 Språk</label>
@@ -515,7 +522,7 @@
     <section class="ach">
       <div class="ticker">
         <div class="ticker-head">
-          <div><small class="muted">📈 XP-KURSEN · XP per dag</small><div class="ticker-val"><b id="tkVal">0</b> <span>XP idag</span></div></div>
+          <div><small class="muted">📈 XP-KURSEN · XP per dag och konfig</small><div class="ticker-val"><b id="tkVal">0</b> <span>XP idag</span></div></div>
           <div id="tkChange" class="tk-change"></div>
         </div>
         <div class="tk-ranges" role="group" aria-label="Tidsperiod">
@@ -525,6 +532,8 @@
           <button class="chip" data-range="all">Allt</button>
         </div>
         <div id="tkChart" class="tk-chart"></div>
+        <div id="tkLegend" class="tk-legend"></div>
+        <p class="muted small tk-hint">Håll fingret på en dag (eller håll musen över) för att se XP och kort den dagen.</p>
         <details class="tk-table"><summary>Visa som tabell</summary><table id="tkTable"></table></details>
       </div>
       <div class="ach-stats" id="achStats"></div>
