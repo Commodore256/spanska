@@ -84,6 +84,9 @@ function saveConfigs() { save("app.configs", configs); }
 // =====================================================================
 //  Data för aktiv konfig
 // =====================================================================
+// Vilken sorts material du övar på just nu (sätts av kortlekar): "mixed", "grammar", "terms" eller "questions"
+let practiceKind = "mixed";
+const KIND_KEEP_VIEWS = new Set(["practice", "cards", "mc", "write", "listen", "speak", "memory", "hard", "done", "settings"]);
 let progress = {}, hidden = {}, cards = [], listFilter = "all", listSort = "new", listSearch = "";
 let cats = [], listCat = "all";   // kategorier i Mina kort och vald kategori ("all", "none" eller id)
 
@@ -654,7 +657,8 @@ function normalize(s, lang) {
 function stripAccents(s) { return s.normalize("NFD").replace(/[̀-ͯ]/g, ""); }
 // "ok", "almost" (bara accent fel) eller "no"
 function check(input, correct, lang) {
-  if (!isLanguage()) return checkLenient(input, correct);
+  // Grammatik rättas exakt. Ämnen (begrepp, frågor, blandat) tål små stavfel.
+  if (!isLanguage() && practiceKind !== "grammar") return checkLenient(input, correct);
   const alts = correct.split(lang === "sv" ? /[\/,]/ : /\//).map(a => normalize(a, lang)).concat(normalize(correct, lang)).filter(Boolean);
   const given = normalize(input, lang);
   if (!given) return "no";
@@ -717,6 +721,8 @@ function render(tplId, name) {
   document.body.classList.remove("login-mode");
   if (typeof onViewChange === "function") onViewChange(name);
   currentView = name;
+  if (!KIND_KEEP_VIEWS.has(name)) practiceKind = "mixed";
+  if (typeof klViewChange === "function") klViewChange(name);
   if (typeof mascotViewChange === "function") mascotViewChange(name);
 }
 function $(sel) { return view.querySelector(sel); }
@@ -1144,6 +1150,8 @@ function renderCardList() {
 
 function cardRow(c) {
   const li = el("li", "crd");
+  // Importläge från en kortlek: ＋ för att kopiera kortet dit
+  if (typeof klPickButton === "function") { const pb = klPickButton(c); if (pb) { li.classList.add("pickable"); li.append(pb); } }
   if (isWarn(c)) li.classList.add("warn");
   else if (isKnown(c)) li.classList.add("known");
 
@@ -1837,7 +1845,8 @@ function buildSession(deck, size = SESSION_SIZE) {
   return shuffle(pool)
     .sort((a, b) => a.box() - b.box())
     .slice(0, size)
-    .map(item => ({ item, showSv: dir === "sv2es" ? true : dir === "es2sv" ? false : Math.random() < 0.5 }));
+    // Frågor visas alltid som fråga → svar
+    .map(item => ({ item, showSv: practiceKind === "questions" ? true : dir === "sv2es" ? true : dir === "es2sv" ? false : Math.random() < 0.5 }));
 }
 
 
@@ -2007,7 +2016,7 @@ function runWrite(deck) {
     refreshTools();
     const { item, showSv } = cur;
     const L = sideLabels();
-    $("#promptLang").textContent = (showSv ? L.sv : L.es) + " → " + (showSv ? L.es : L.sv);
+    $("#promptLang").textContent = promptLabel(showSv);
     $("#prompt").textContent = showSv ? item.sv : item.es;
     input.placeholder = showSv ? `Skriv på ${langInfo().name.toLowerCase()}…` : "Skriv på svenska…";
     input.lang = showSv ? cfg().lang : "sv";
@@ -2079,6 +2088,9 @@ function showPracticeMenu(deck) {
     ? `${deck.name} · ${n} kort` + (srOn() ? ` · 📅 ${dueItems(deck.items).length} att repetera idag` : "")
     : `${deck.name} · inga färdiga kort i listan just nu`;
   const grid = $("#pmGrid");
+  practiceKind = deck.kind || "mixed";
+  if (typeof klPracticeBanner === "function") klPracticeBanner(deck);
+  const RECOMMENDED = { grammar: ["write", "hard"], terms: ["mc", "cards"], questions: ["hard", "cards"] }[practiceKind] || [];
   // När en övning är klar kommer du tillbaka hit
   const sub = { ...deck, back: () => showPracticeMenu(deck) };
   $("#pmAdventure").onclick = () => showAdventure({ back: () => showPracticeMenu(deck) });
@@ -2092,6 +2104,7 @@ function showPracticeMenu(deck) {
     const b = el("button", "pm-mode");
     b.style.setProperty("--i", i);
     b.append(el("span", "pm-icon", m.icon), el("b", "", m.name), el("small", "", why || m.desc));
+    if (!why && RECOMMENDED.includes(m.id)) { b.classList.add("recommended"); b.append(el("span", "pm-rec", "★ Passar kortleken")); }
     if (why) { b.disabled = true; b.classList.add("off"); }
     b.onclick = () => m.run(sub);
     grid.append(b);
@@ -2102,12 +2115,19 @@ function showPracticeMenu(deck) {
 //  Svårt läge: flashcards och skrivfrågor blandat. Långa svar rättas av AI:n.
 // =====================================================================
 // Ett långt svar (förklaring, mening) går inte att rätta bokstav för bokstav
+// Rubriken ovanför frågan, anpassad efter typen av kortlek
+const KIND_TAG = { grammar: "🔤 Grammatik", terms: "📖 Begrepp", questions: "❓ Fråga" };
+function promptLabel(showSv) {
+  const L = sideLabels(), base = (showSv ? L.sv : L.es) + " → " + (showSv ? L.es : L.sv);
+  if (practiceKind === "questions") return showSv ? "❓ Fråga → svar" : "💬 Svar → vilken fråga?";
+  return KIND_TAG[practiceKind] ? `${KIND_TAG[practiceKind]} · ${base}` : base;
+}
 function isLongAnswer(text) { return wordCount(text) > (isLanguage() ? 4 : 3) || String(text).length > 40; }
 async function aiGrade(question, correct, answer, c = cfg()) {
   const ai = aiConfig();
   return fetchJson(ai.url.replace(/\/+$/, ""), {
     method: "POST", headers: aiHeaders(ai),
-    body: JSON.stringify({ mode: "grade", question, correct, answer, cfg: aiCfgPayload(c) })
+    body: JSON.stringify({ mode: "grade", question, correct, answer, kind: practiceKind, cfg: aiCfgPayload(c) })
   }, 30000);
 }
 function runHard(deck) {
@@ -2115,7 +2135,9 @@ function runHard(deck) {
   render("tpl-hard", "hard");
   goBack = deck.back; reopen = deck.back;
   setupAccents(view);
-  const queue = buildSession(deck).map(q => ({ ...q, kind: Math.random() < 0.5 ? "flash" : "write" })), total = queue.length;
+  // Grammatik och frågor får fler skrivfrågor
+  const writeShare = { grammar: 0.75, questions: 0.65 }[practiceKind] ?? 0.5;
+  const queue = buildSession(deck).map(q => ({ ...q, kind: Math.random() < writeShare ? "write" : "flash" })), total = queue.length;
   let right = 0, cur = null, answered = false, done = 0;
   const sess = practiceSession(), L = sideLabels();
   const promptCard = view.querySelector(".hard-card"), input = $("#hardInput"), form = $("#hardForm");
@@ -2134,7 +2156,7 @@ function runHard(deck) {
     refreshTools(); dk.show();
     $("#progress").textContent = `${total - queue.length} / ${total}`;
     setPbar(done, total);
-    $("#promptLang").textContent = (cur.showSv ? L.sv : L.es) + " → " + answerLabel();
+    $("#promptLang").textContent = promptLabel(cur.showSv);
     $("#hardKind").textContent = cur.kind === "flash" ? "🃏 Flashcard" : isLongAnswer(facit()) ? "✍️ Skriv – AI:n rättar" : "⌨️ Skriv";
     $("#prompt").textContent = q();
     $("#prompt").classList.toggle("long", q().length > 60);
@@ -2342,7 +2364,7 @@ function runMC(deck) {
     refreshTools();
     const { item, showSv } = cur, L = sideLabels();
     const answerSide = showSv ? "es" : "sv", correct = item[answerSide];
-    $("#promptLang").textContent = (showSv ? L.sv : L.es) + " → " + (showSv ? L.es : L.sv);
+    $("#promptLang").textContent = promptLabel(showSv);
     $("#prompt").textContent = showSv ? item.sv : item.es;
     $("#prompt").classList.toggle("long", (showSv ? item.sv : item.es).length > 40);
     $("#progress").textContent = `${total - queue.length} / ${total}`;
@@ -3071,7 +3093,9 @@ function renderConfigList() {
     pick.onclick = () => switchConfig(c.id);
     const edit = el("button", "config-edit-btn", "✏️"); edit.title = "Ändra konfig";
     edit.onclick = () => { closeDrawer(); showConfigEdit(c.id); };
-    li.append(pick, edit);
+    const decks = el("button", "config-edit-btn config-decks-btn", "🗂️"); decks.title = "Kortlekar i " + c.name;
+    decks.onclick = () => { switchConfig(c.id); if (typeof showKortlekar === "function") showKortlekar(); };
+    li.append(pick, decks, edit);
     ul.append(li);
   }
 }

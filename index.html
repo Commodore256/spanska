@@ -97,6 +97,11 @@
         <span id="myCardsInfo" class="muted"></span>
         <div class="bar"><i id="myCardsBar"></i></div>
       </button>
+      <button id="btnKortlekar" class="kl-quick home-kl">
+        <span class="kl-quick-stack" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="kl-quick-text"><b>Kortlekar</b><small id="klHomeInfo">Dela upp korten i lekar och underlekar</small></span>
+        <span class="kl-quick-go">➜</span>
+      </button>
       <p class="lead">Färdiga övningslekar</p>
       <div id="deckList" class="deck-list"></div>
       <div class="home-actions">
@@ -115,6 +120,11 @@
         <button id="btnCats" class="btn-small" type="button">Hantera kategorier</button>
       </div>
       <p id="catHint" class="muted small cat-hint"></p>
+      <button id="btnToKortlekar" class="kl-quick">
+        <span class="kl-quick-stack" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="kl-quick-text"><b>Kortlekar</b><small id="klMyInfo">Lekar och underlekar med dina kort</small></span>
+        <span class="kl-quick-go">➜</span>
+      </button>
       <form id="addForm" class="add-form" autocomplete="off">
         <div class="add-cols">
           <label><span id="lblSv">Svenska</span><input id="inSv" type="text" lang="sv" placeholder="t.ex. att hjälpa" spellcheck="false"></label>
@@ -328,6 +338,68 @@
       <div class="row tight"><button id="btnDupScan" class="btn secondary">🤖 Skanna igen</button></div>
       <div class="dup-head"><span>Kort 1</span><span>Kort 2</span></div>
       <div id="dupList" class="dup-list"></div>
+    </section>
+  </template>
+
+  <!-- Kortlekar -->
+  <template id="tpl-kl">
+    <section class="kl">
+      <div id="klHero" class="kl-hero">
+        <span class="kl-blob b1"></span><span class="kl-blob b2"></span><span class="kl-blob b3"></span>
+        <span id="klHeroIcon" class="kl-hero-icon"></span>
+        <div class="kl-hero-text"><h2 id="klHeroTitle"></h2><p id="klHeroSub"></p></div>
+      </div>
+      <div id="klGrid" class="kl-grid"></div>
+    </section>
+  </template>
+
+  <!-- En kortlek -->
+  <template id="tpl-kl-deck">
+    <section class="kd">
+      <nav id="kdCrumbs" class="kd-crumbs"></nav>
+      <div id="kdHero" class="kl-hero kd-hero">
+        <span class="kl-blob b1"></span><span class="kl-blob b2"></span><span class="kl-blob b3"></span>
+        <div class="kd-hero-main">
+          <span id="kdIcon" class="kl-hero-icon"></span>
+          <div class="kl-hero-text">
+            <h2 id="kdName"></h2>
+            <span id="kdKind"></span>
+            <p id="kdDesc"></p>
+          </div>
+          <div id="kdRing"></div>
+        </div>
+        <div id="kdNums" class="kd-nums"></div>
+      </div>
+      <div class="kd-actions">
+        <button id="kdPractice" class="kd-btn play"><span class="kd-btn-icon">▶</span><span><b>Öva kortleken</b><small></small></span></button>
+        <button id="kdImport" class="kd-btn import"><span class="kd-btn-icon">📥</span><span><b>Importera kort från Mina kort</b><small>Tryck ＋ vid korten du vill ha med</small></span></button>
+        <button id="kdNewSub" class="kd-btn sub"><span class="kd-btn-icon">＋</span><span><b>Ny underkortlek</b><small>Med egen typ, färg och ikon</small></span></button>
+        <button id="kdEdit" class="kd-btn edit"><span class="kd-btn-icon">✏️</span><span><b>Ändra leken</b><small>Namn, typ, färg – eller ta bort</small></span></button>
+      </div>
+      <h3 id="kdSubsHead" class="kd-h">🗂️ Underkortlekar</h3>
+      <div id="kdSubs" class="kl-grid subs"></div>
+      <h3 id="kdCardsHead" class="kd-h"></h3>
+      <ul id="kdCards" class="kd-cards"></ul>
+    </section>
+  </template>
+
+  <!-- Skapa / ändra kortlek -->
+  <template id="tpl-kl-edit">
+    <section class="ke">
+      <h2 id="keHead"></h2>
+      <div id="kePreview" class="ke-preview"></div>
+      <label class="field">Namn<input id="keName" type="text" maxlength="40"></label>
+      <div class="field">Vad innehåller leken? <small class="muted">Övningen anpassas efter det. Flashcards är som vanligt.</small></div>
+      <div id="keKinds" class="ke-kinds"></div>
+      <div class="field">Färg</div>
+      <div id="keColors" class="ke-colors"></div>
+      <div class="field">Ikon</div>
+      <div id="keIcons" class="ke-icons"></div>
+      <label class="field ke-own">Egen ikon (emoji)<input id="keIconOwn" type="text" maxlength="8" placeholder="🦉"></label>
+      <div class="ke-row">
+        <button id="keSave" class="kd-btn play ke-save"><span class="kd-btn-icon">✓</span><span><b>Spara kortleken</b></span></button>
+        <button id="keDelete" class="btn bad hidden">🗑 Ta bort</button>
+      </div>
     </section>
   </template>
 
@@ -702,5 +774,6 @@
   <script src="sync.js"></script>
   <script src="adventure.js"></script>
   <script src="mascot.js"></script>
+  <script src="decks.js"></script>
 </body>
 </html>
