@@ -3251,8 +3251,8 @@ function showConfigEdit(id) {
     sw.append(b);
   }
   // Ikoner att välja bland
-  // Flaggor för språken som brukar finnas i skolan, och Sverige
-  const CFG_ICONS = ["🇸🇪", "🇬🇧", "🇺🇸", "🇪🇸", "🇩🇪", "🇫🇷", "🇮🇹", "🇵🇹", "🇨🇳", "🇯🇵", "🇷🇺", "🇸🇦", "🇫🇮", "🇳🇴", "🇩🇰", "🇳🇱", "🇰🇷", "🇬🇷", "🇹🇷", "🇵🇱", "🇲🇽", "🇦🇷", "🇧🇷", "🇨🇦",
+  // Flaggor (ritas som bilder, se FLAG_SVG) och ämnesikoner
+  const CFG_ICONS = ["🇸🇪", "🇪🇸", "🇬🇧", "🇫🇷", "🇩🇪", "🇮🇹",
     "⚖️", "💼", "📊", "💰", "🏛️", "🌍", "🧪", "🔬", "🧮", "📐", "💻", "🧠", "🩺", "🎨", "🎵", "⚽", "📚", "📘", "📝", "🗣️", "🎓", "🌱", "⭐", "🚀"];
   const iconBox = $("#cfgIcons");
   const markIcon = () => iconBox.querySelectorAll(".cfg-icon-opt").forEach(b => b.classList.toggle("on", b.dataset.emoji === icon.value.trim()));
@@ -3370,3 +3370,54 @@ applyConfigUI();
 
 showHome();
 processQueue();
+
+
+// =====================================================================
+//  Flaggor som bilder
+// =====================================================================
+// Windows kan inte visa flagg-emojis (där blir de bokstäver som "ES"). Därför byts de sex
+// flaggorna appen använder ut mot små ritade flaggor, var de än står på sidan.
+const FLAG_SVG = {
+  SE: ["Sverige", '<svg viewBox="0 0 16 10"><rect width="16" height="10" fill="#006aa7"/><rect x="5" width="2" height="10" fill="#fecc02"/><rect y="4" width="16" height="2" fill="#fecc02"/></svg>'],
+  ES: ["Spanien", '<svg viewBox="0 0 3 2"><rect width="3" height="2" fill="#c60b1e"/><rect y=".5" width="3" height="1" fill="#ffc400"/></svg>'],
+  GB: ["Storbritannien", '<svg viewBox="0 0 60 30"><clipPath id="ukc"><path d="M30 15h30v15zv15H0zH0V0zV0h30z"/></clipPath><rect width="60" height="30" fill="#012169"/><path d="M0 0l60 30M60 0L0 30" stroke="#fff" stroke-width="6"/><path d="M0 0l60 30M60 0L0 30" clip-path="url(#ukc)" stroke="#c8102e" stroke-width="4"/><path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="#c8102e" stroke-width="6"/></svg>'],
+  FR: ["Frankrike", '<svg viewBox="0 0 3 2"><rect width="1" height="2" fill="#002395"/><rect x="1" width="1" height="2" fill="#fff"/><rect x="2" width="1" height="2" fill="#ed2939"/></svg>'],
+  DE: ["Tyskland", '<svg viewBox="0 0 5 3"><rect width="5" height="1" fill="#000"/><rect y="1" width="5" height="1" fill="#dd0000"/><rect y="2" width="5" height="1" fill="#ffce00"/></svg>'],
+  IT: ["Italien", '<svg viewBox="0 0 3 2"><rect width="1" height="2" fill="#009246"/><rect x="1" width="1" height="2" fill="#fff"/><rect x="2" width="1" height="2" fill="#ce2b37"/></svg>']
+};
+const FLAG_RE = /\uD83C[\uDDE6-\uDDFF]\uD83C[\uDDE6-\uDDFF]/g, FLAG_TEST = /\uD83C[\uDDE6-\uDDFF]\uD83C[\uDDE6-\uDDFF]/;
+function flagCode(emoji) { return [...emoji].map(ch => String.fromCharCode(ch.codePointAt(0) - 0x1F1E6 + 65)).join(""); }
+function flagSpan(code) {
+  const f = FLAG_SVG[code], s = document.createElement("span");
+  s.className = "flag-ic"; s.setAttribute("role", "img"); s.setAttribute("aria-label", f[0]); s.title = f[0];
+  s.innerHTML = f[1];
+  return s;
+}
+function replaceFlags(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: n => FLAG_TEST.test(n.nodeValue) && !n.parentElement?.closest("script, style, textarea, title")
+      ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+  });
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const n of nodes) {
+    const txt = n.nodeValue, frag = document.createDocumentFragment();
+    let last = 0;
+    for (const m of txt.matchAll(FLAG_RE)) {
+      const code = flagCode(m[0]);
+      if (!FLAG_SVG[code]) continue;
+      frag.append(txt.slice(last, m.index), flagSpan(code));
+      last = m.index + m[0].length;
+    }
+    if (!last) continue;
+    frag.append(txt.slice(last));
+    n.replaceWith(frag);
+  }
+}
+(function watchFlags() {
+  let queued = false;
+  const run = () => { queued = false; replaceFlags(document.body); };
+  new MutationObserver(() => { if (!queued) { queued = true; requestAnimationFrame(run); } })
+    .observe(document.body, { childList: true, subtree: true, characterData: true });
+  run();
+})();
