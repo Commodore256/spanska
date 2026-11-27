@@ -2451,6 +2451,35 @@ function runMC(deck) {
 // =====================================================================
 //  Memory
 // =====================================================================
+// ---------- Memory: hur länge korten ligger uppvända, och text som krymper tills den får plats ----------
+function memDelay() { const v = Math.round(Number(load("app.memDelay", 3))); return Math.min(15, Math.max(1, v || 3)); }
+function memDelaySlider() {
+  const wrap = el("div", "mem-slider");
+  const top = el("div", "mem-slider-top");
+  const val = el("b", "mem-slider-val");
+  top.append(el("span", "", "Visningstid"), val);
+  const input = el("input"); input.type = "range"; input.min = 1; input.max = 15; input.step = 1; input.value = memDelay();
+  input.setAttribute("aria-label", "Sekunder korten är uppvända");
+  const scale = el("div", "mem-slider-scale"); scale.append(el("span", "", "1 s"), el("span", "", "8 s"), el("span", "", "15 s"));
+  const draw = () => { val.textContent = `${input.value} s`; input.style.setProperty("--p", ((input.value - 1) / 14 * 100) + "%"); };
+  input.oninput = () => { save("app.memDelay", Number(input.value)); draw(); };
+  input.onchange = () => playClass(val, "pop");
+  draw();
+  wrap.append(top, input, scale);
+  return wrap;
+}
+// Minskar textstorleken tills texten (och varje enskilt ord) får plats i rutan
+function fitText(textEl, box, max = 17, min = 9) {
+  textEl.style.overflowWrap = "normal";
+  let size = max;
+  textEl.style.fontSize = size + "px";
+  // Inget ord får sticka ut åt sidan, och hela texten ska rymmas på höjden
+  const fits = () => textEl.scrollWidth <= textEl.clientWidth + 1 && textEl.scrollHeight <= box.clientHeight + 1;
+  while (size > min && !fits()) { size -= 0.5; textEl.style.fontSize = size + "px"; }
+  if (!fits()) textEl.style.overflowWrap = "anywhere";   // sista utvägen: bryt mitt i ord
+}
+
+function klFillIconsSafe() { if (typeof klFillIcons === "function") klFillIcons(); }
 function runMemory(deck) {
   titleEl.textContent = "Memory";
   render("tpl-memory", "memory");
@@ -2461,21 +2490,50 @@ function runMemory(deck) {
   const sess = practiceSession(), L = sideLabels();
   const tiles = shuffle(pairs.flatMap((it, i) => [{ i, side: "sv", text: it.sv }, { i, side: "es", text: it.es }]));
   const grid = $("#memGrid");
-  let open = [], matched = 0, moves = 0, lock = false;
+  let open = [], matched = 0, moves = 0, lock = false, skipWait = null;
+  // Inställning för visningstid direkt i memory
+  klFillIconsSafe();
+  $("#btnMemSettings").onclick = () => {
+    const box = $("#memSettings");
+    if (!box.childElementCount) box.append(memDelaySlider());
+    box.classList.toggle("hidden");
+    if (!box.classList.contains("hidden")) playClass(box, "pop-in");
+  };
+  const color = deck.color || cfgColor(cfg());
+  const backIcon = deck.klId && typeof klDeck === "function" ? klDeck(deck.klId)?.icon : "layers";
   const status = () => { $("#progress").textContent = `Par: ${matched} / ${pairs.length} · Drag: ${moves}`; };
   status();
   tiles.forEach((t, idx) => {
     const b = el("button", "mtile");
     b.style.setProperty("--i", idx);
     const inner = el("span", "mtile-inner");
-    const back = el("span", "mt-face mt-back", "Ñ");
+    const back = el("span", "mt-face mt-back");
+    if (typeof klPaint === "function") klPaint(back, color);
+    back.append(el("span", "mt-blob"), typeof klIconEl === "function" ? klIconEl(backIcon || "layers", "mt-back-ic") : el("span", "mt-back-ic", "Ñ"));
     const front = el("span", "mt-face mt-front");
-    front.append(el("small", "", t.side === "sv" ? L.sv : L.es), el("span", "mt-text" + (t.text.length > 28 ? " long" : ""), t.text));
+    const textBox = el("span", "mt-textbox"), text = el("span", "mt-text", t.text);
+    textBox.append(text);
+    front.append(el("small", "", t.side === "sv" ? L.sv : L.es), textBox, el("i", "mt-timer"));
     inner.append(back, front); b.append(inner);
+    b._fit = () => fitText(text, textBox);
     b.onclick = () => flipTile(b, t);
     grid.append(b);
   });
+  // Anpassa textstorleken när korten finns på sidan (och om fönstret ändrar storlek)
+  // Långa förklaringar: färre och större kort, så att texten inte blir pytteliten
+  const longest = Math.max(...tiles.map(t => t.text.length));
+  grid.classList.toggle("roomy", longest > 40);
+  grid.classList.toggle("xroomy", longest > 90);
+  const fitAll = () => grid.querySelectorAll(".mtile").forEach(b => b._fit?.());
+  requestAnimationFrame(() => requestAnimationFrame(fitAll));
+  document.fonts?.ready?.then(() => alive(grid) && fitAll());
+  let fitT = null;
+  const onResize = () => { if (!alive(grid)) return window.removeEventListener("resize", onResize); clearTimeout(fitT); fitT = setTimeout(fitAll, 150); };
+  window.addEventListener("resize", onResize);
+
   async function flipTile(b, t) {
+    // Två uppvända kort som inte var ett par: tryck på något av dem för att vända tillbaka direkt
+    if (skipWait && b.classList.contains("open")) { skipWait(); return; }
     if (lock || b.classList.contains("open") || b.classList.contains("matched")) return;
     b.classList.add("open");
     open.push({ b, t });
@@ -2500,7 +2558,11 @@ function runMemory(deck) {
       }
     } else {
       sess.breakCombo();
-      await wait(950);
+      const ms = memDelay() * 1000;
+      [x.b, y.b].forEach(tb => { tb.classList.add("waiting"); tb.style.setProperty("--wait", ms + "ms"); });
+      await new Promise(res => { const tm = setTimeout(res, ms); skipWait = () => { clearTimeout(tm); res(); }; });
+      skipWait = null;
+      [x.b, y.b].forEach(tb => tb.classList.remove("waiting"));
       if (!alive(grid)) return;
       playClass(x.b, "shake"); playClass(y.b, "shake");
       x.b.classList.remove("open"); y.b.classList.remove("open");
@@ -3094,6 +3156,7 @@ function showSettings() {
     } catch (e) { out.textContent = "✗ Fungerade inte: " + e.message; }
   };
   $("#cardDirBox").append(cardDirSwitch(id => toast(`🃏 Flashcards: ${CARD_DIRS.find(d => d[0] === id)[1]}`)));
+  $("#memDelayBox").append(memDelaySlider());
   const dirSel = $("#dirSel");
   dirSel.value = load(lsKey("dir"), "mix");
   dirSel.onchange = () => save(lsKey("dir"), dirSel.value);

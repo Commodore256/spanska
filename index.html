@@ -454,6 +454,9 @@
       <h2>Flashcards</h2>
       <p class="muted small">Vilket håll korten visas: <b>Standard</b> som de är inskrivna i Mina kort, <b>Slump</b> blandat, eller <b>Tvärtom</b> för att öva från andra hållet. Går också att ändra mitt i en flashcard-övning.</p>
       <div id="cardDirBox"></div>
+      <h2>Memory</h2>
+      <p class="muted small">Hur länge två kort som inte är ett par ligger uppvända. Längre tid hinner du läsa långa förklaringar – tryck på ett uppvänt kort för att vända tillbaka direkt.</p>
+      <div id="memDelayBox"></div>
       <h2>Övningsriktning <small class="muted">(övriga övningar)</small></h2>
       <select id="dirSel">
         <option value="mix">Blandat – båda hållen</option>
@@ -554,8 +557,11 @@
   <!-- Memory -->
   <template id="tpl-memory">
     <section class="memory">
-      <div class="practice-head"><p id="progress" class="muted"></p><span id="combo" class="combo hidden"></span></div>
-      <p class="muted small">Vänd två kort i taget och hitta paren som betyder samma sak.</p>
+      <div class="practice-head"><p id="progress" class="muted"></p><span id="combo" class="combo hidden"></span>
+        <div class="practice-tools"><button id="btnMemSettings" class="tool mem-set-btn" title="Hur länge korten är uppvända"><span class="mem-set-ic" data-ic="clock"></span><span>Visningstid</span></button></div>
+      </div>
+      <div id="memSettings" class="mem-settings hidden"></div>
+      <p class="muted small">Vänd två kort i taget och hitta paren som betyder samma sak. Tryck på ett uppvänt kort för att vända tillbaka direkt.</p>
       <div id="memGrid" class="mem-grid"></div>
     </section>
   </template>
