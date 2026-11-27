@@ -1847,3 +1847,10 @@ body.adv-lesson .chat-panel, body:has(.adv-lesson-view) .chat-panel { bottom: ca
 .cfg-badge:hover { transform: scale(1.06); }
 .cfg-badge.hidden { display: none; }
 .home-practice { margin: 4px 0 14px; }
+/* Öva-knappen på startsidan: samma storlek som Äventyr-knappen */
+.home-practice { display: block; margin: 0 0 16px; }
+.home-practice .kd-btn.btn-practice { width: 100%; max-width: none; border-radius: 20px; padding: 16px 18px; gap: 14px; min-height: 96px; }
+.home-practice .kd-btn-icon { width: 64px; height: 64px; border-radius: 18px; }
+.home-practice .kd-btn-icon svg { width: 40%; height: 40%; }
+.home-practice .kd-btn-text b { font-size: 1.5rem; font-weight: 800; }
+.home-practice .kd-btn-text small { font-size: .9rem; }
