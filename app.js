@@ -1128,6 +1128,8 @@ function renderCardList() {
     bulk.onclick = () => askAi(list);
   }
   const info = view.querySelector("#practiceInfo");
+  const sub = view.querySelector("#practiceSub");
+  if (sub) { const n = list.filter(c => c.sv && c.es).length; sub.textContent = n ? `${n} kort${listSearch.trim() || listFilter !== "all" || listCat !== "all" ? " – det du filtrerat fram" : ""}` : "Inga kort att öva än"; }
   if (info) {
     const usable = list.filter(c => c.sv && c.es);
     const due = srOn() ? dueItems(myCardsDeck(usable).items).length : 0;
@@ -1851,8 +1853,85 @@ function buildSession(deck, size = SESSION_SIZE) {
 
 
 // En övningsomgång: håller koll på combo (rätt i rad) och delar ut XP
+// En post i historiken: frågan, vad du svarade och vad som var rätt
+function histEntry(c, given, ok, how = null) {
+  return { q: c.showSv ? c.item.sv : c.item.es, correct: c.showSv ? c.item.es : c.item.sv, label: promptLabel(c.showSv), given, ok, how };
+}
+// Historik i en övning: svep åt höger (eller tryck ‹) för att se tidigare frågor, svep åt vänster (›) för att gå tillbaka
+// Svep: lyssnar en gång på hela sidan och skickar vidare till övningen som visas just nu
+let histSwipe = null;
+(function setupHistSwipe() {
+  let sx = null, sy = 0;
+  document.addEventListener("touchstart", e => {
+    if (!histSwipe || !alive(histSwipe.section) || e.touches.length !== 1 ||
+        e.target.closest("input, textarea, select, .mem-slider, .dir3, .drawer, .mpop-bg, .cdlg-bg")) { sx = null; return; }
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+  }, { passive: true });
+  document.addEventListener("touchend", e => {
+    if (sx == null || !histSwipe || !alive(histSwipe.section)) return;
+    const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy; sx = null;
+    if (Math.abs(dx) < 70 || Math.abs(dy) > 60 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
+    if (dx > 0) histSwipe.prev(); else histSwipe.next();
+  }, { passive: true });
+  document.addEventListener("touchcancel", () => { sx = null; }, { passive: true });
+})();
+function practiceHistory() {
+  const hist = [];
+  let idx = -1;   // -1 = du är på den aktuella frågan
+  const section = view.querySelector("section");
+  if (!section) return { log() {} };
+  const nav = el("div", "hist-nav hidden");
+  const prev = el("button", "hist-btn prev"), next = el("button", "hist-btn next"), mid = el("span", "hist-mid");
+  prev.type = next.type = "button";
+  prev.innerHTML = `<span class="hist-arrow">‹</span><span>Förra</span>`;
+  next.innerHTML = `<span>Nästa</span><span class="hist-arrow">›</span>`;
+  nav.append(prev, mid, next);
+  const panel = el("div", "rv-panel hidden");
+  const anchor = section.querySelector(".pbar") || section.querySelector(".practice-head");
+  if (anchor) anchor.after(nav, panel); else section.prepend(nav, panel);
+
+  function draw(dir = 0) {
+    nav.classList.toggle("hidden", !hist.length);
+    const reviewing = idx >= 0;
+    section.classList.toggle("reviewing", reviewing);
+    panel.classList.toggle("hidden", !reviewing);
+    prev.disabled = !hist.length || idx === 0;
+    next.disabled = !reviewing;
+    next.querySelector("span").textContent = reviewing && idx === hist.length - 1 ? "Till frågan" : "Nästa";
+    mid.textContent = reviewing ? `Fråga ${idx + 1} av ${hist.length}` : "Svep åt höger för förra frågan";
+    if (!reviewing) return;
+    const h = hist[idx];
+    panel.innerHTML = "";
+    const card = el("div", "rv-card " + (h.ok ? "ok" : "bad"));
+    const top = el("div", "rv-top");
+    top.append(el("span", "rv-badge", h.ok ? "✓ Rätt" : "✗ Fel"), el("small", "rv-label", h.label || ""));
+    card.append(top, el("div", "rv-q", h.q));
+    const yours = el("div", "rv-row yours");
+    yours.append(el("small", "", h.how === "self" ? "Du sa" : "Ditt svar"),
+      el("span", "", h.given == null || h.given === "" ? "🤷 Jag vet inte" : h.given));
+    const right = el("div", "rv-row right");
+    right.append(el("small", "", "Rätt svar"), el("span", "", h.correct));
+    card.append(yours, right);
+    if (h.note) card.append(el("div", "rv-note", "🤖 " + h.note));
+    const back = el("button", "rv-return", "Tillbaka till frågan ›");
+    back.onclick = () => { idx = -1; draw(1); };
+    panel.append(card, back);
+    if (dir) playClass(card, dir < 0 ? "rv-from-left" : "rv-from-right");
+  }
+  const goPrev = () => { if (!hist.length) return; const was = idx; idx = idx < 0 ? hist.length - 1 : Math.max(0, idx - 1); if (idx !== was) draw(-1); };
+  const goNext = () => { if (idx < 0) return; idx = idx + 1 >= hist.length ? -1 : idx + 1; draw(1); };
+  prev.onclick = goPrev; next.onclick = goNext;
+  // Svep med fingret var som helst på skärmen (se histSwipe nedan)
+  histSwipe = { section, prev: goPrev, next: goNext };
+  return {
+    log(entry) { hist.push(entry); if (idx < 0) draw(); },
+    reviewing: () => idx >= 0
+  };
+}
+
 function practiceSession() {
   let combo = 0;
+  const history = practiceHistory();
   const mult = () => combo >= 10 ? 3 : combo >= 5 ? 2 : 1;
   function show() {
     const b = view.querySelector("#combo");
@@ -1876,7 +1955,8 @@ function practiceSession() {
       show();
       return res;
     },
-    breakCombo() { combo = 0; show(); }
+    breakCombo() { combo = 0; show(); },
+    log(entry) { history.log(entry); }
   };
 }
 
@@ -2005,6 +2085,7 @@ function runCards(deck) {
   async function answer(ok, btn) {
     if (busy || !revealed) return;
     busy = true;
+    sess.log(histEntry(cur, ok ? "Jag kunde" : "Jag kunde inte", ok, "self"));
     if (ok && !cur.retry) right++;
     sess.answer(cur.item, ok, btn, "cards", cur.retry);
     if (ok) { done++; burst(btn); }
@@ -2071,6 +2152,7 @@ function runWrite(deck) {
     const { item, showSv } = cur;
     const correct = showSv ? item.es : item.sv;
     const result = check(input.value, correct, showSv ? "es" : "sv");
+    sess.log(histEntry(cur, input.value.trim(), result !== "no"));
     input.disabled = true;
     if (result !== "no") {
       if (!cur.retry) right++;
@@ -2217,8 +2299,11 @@ function runHard(deck) {
   }
 
   // Resultat av ett kort (gemensamt för alla vägar)
+  let lastGiven = null, lastNote = null, lastHow = null;
   function finish(ok, mode, fromEl) {
     answered = true; dk.hide();
+    sess.log({ ...histEntry(cur, lastGiven, ok, lastHow), note: lastNote });
+    lastGiven = lastNote = lastHow = null;
     if (ok) { if (!cur.retry) right++; done++; playClass(promptCard, "pop"); burst(promptCard, ["✨", "⭐", "💪", "💫"], 10); }
     else { queue.splice(Math.min(3, queue.length), 0, { ...cur, retry: true }); playClass(promptCard, "shake"); }
     sess.answer(cur.item, ok, fromEl || promptCard, mode, cur.retry);
@@ -2246,7 +2331,7 @@ function runHard(deck) {
     if (cur.showSv && isLanguage()) speak(cur.item.es);
     $("#btnSelfYes").focus();
   };
-  const self = ok => { if (answered) return; $("#selfRow").classList.add("hidden"); finish(ok, "cards", ok ? $("#btnSelfYes") : null); };
+  const self = ok => { if (answered) return; $("#selfRow").classList.add("hidden"); lastGiven = ok ? "Jag kunde" : "Jag kunde inte"; lastHow = "self"; finish(ok, "cards", ok ? $("#btnSelfYes") : null); };
   $("#btnSelfYes").onclick = () => self(true);
   $("#btnSelfNo").onclick = () => self(false);
 
@@ -2268,6 +2353,7 @@ function runHard(deck) {
     if (answered) return next();
     const given = input.value.trim(), correct = facit();
     if (!given) { toast("Skriv ett svar – eller tryck på ”Jag vet inte”"); input.focus(); return; }
+    lastGiven = given;
     input.disabled = true; $("#btnGrade").disabled = true; dk.hide();
     if (!isLongAnswer(correct)) {
       const r = check(given, correct, cur.showSv ? "es" : "sv");
@@ -2284,6 +2370,7 @@ function runHard(deck) {
         const g = await aiGrade(q(), correct, given);
         if (cur !== id || !alive(feedback)) return;
         showFacit(g.ok ? "ok" : "no", g.ok ? `✓ ${phrPick("praise")} (${g.score} %)` : `✗ Inte riktigt (${g.score} %)`, g.feedback ? "🤖 " + g.feedback : "");
+        lastNote = g.feedback ? `${g.feedback} (${g.score} %)` : null;
         return finish(!!g.ok, "write");
       } catch (err) {
         if (cur !== id || !alive(feedback)) return;
@@ -2295,7 +2382,7 @@ function runHard(deck) {
     $("#judgeRow").classList.remove("hidden");
     $("#btnJudgeYes").focus();
   };
-  const judge = ok => { if (answered) return; $("#judgeRow").classList.add("hidden"); finish(ok, "write"); };
+  const judge = ok => { if (answered) return; $("#judgeRow").classList.add("hidden"); lastNote = "Du bedömde själv mot facit."; finish(ok, "write"); };
   $("#btnJudgeYes").onclick = () => judge(true);
   $("#btnJudgeNo").onclick = () => judge(false);
   btnNext.onclick = next;
@@ -2387,6 +2474,7 @@ function runMC(deck) {
     if (answered) return;
     answered = true; dkM.hide();
     opts.querySelectorAll(".mc-opt").forEach(b => { b.disabled = true; if (b.dataset.correct) b.classList.add("right"); });
+    sess.log(histEntry(cur, null, false));
     sess.answer(cur.item, false, promptCard, "mc", cur.retry);
     queue.splice(Math.min(3, queue.length), 0, { ...cur, retry: true });
     speak(cur.item.es);
@@ -2421,6 +2509,7 @@ function runMC(deck) {
   async function choose(btn, ok) {
     if (answered) return;
     answered = true; dkM.hide();
+    sess.log(histEntry(cur, btn.querySelector(".mc-text")?.textContent ?? btn.textContent, ok));
     opts.querySelectorAll(".mc-opt").forEach(b => { b.disabled = true; if (b.dataset.correct) b.classList.add("right"); });
     if (ok) {
       if (!cur.retry) right++;
@@ -2609,6 +2698,7 @@ function runListen(deck) {
     if (answered) return next();
     answered = true; dkL.hide();
     const result = check(input.value, cur.item.es, "es");
+    sess.log({ q: "🎧 Du hörde ett ord", label: "Lyssna och skriv", given: input.value.trim(), correct: `${cur.item.es} (${cur.item.sv})`, ok: result !== "no" });
     input.disabled = true;
     if (result !== "no") {
       if (!cur.retry) right++;

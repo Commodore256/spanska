@@ -1647,3 +1647,50 @@ button.adv-label:not(.can-repeat) { opacity: .85; }
 .mascot[data-mood="sad"] .m-ear { animation: none; }
 @keyframes m-owl-tilt { 0%, 70%, 100% { transform: rotate(0); } 76% { transform: rotate(-13deg); } 84% { transform: rotate(-13deg); } 90% { transform: rotate(9deg); } 95% { transform: rotate(0); } }
 @keyframes m-tuft { 0%, 86%, 100% { transform: rotate(0); } 90% { transform: rotate(-8deg); } 94% { transform: rotate(5deg); } }
+
+/* Öva-knappen i Mina kort – samma stil som kortlekarnas knappar */
+.practice-row .kd-btn.btn-practice { width: 100%; max-width: 560px; margin: 0 auto; }
+.practice-row { display: flex; justify-content: center; }
+.kd-btn-go { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.22); margin-left: auto; flex: none; }
+.kd-btn-go svg { width: 50%; height: 50%; stroke-width: 2.6; }
+.btn-practice b { font-size: 1.3rem; }
+
+/* Historik i övningar: förra / nästa fråga */
+.hist-nav { display: flex; align-items: center; gap: 8px; margin: 8px 0 10px; }
+.hist-nav.hidden { display: none; }
+.hist-btn { display: inline-flex; align-items: center; gap: 6px; border: 0; cursor: pointer; font: inherit; font-weight: 800; font-size: .9rem;
+  padding: 8px 14px; border-radius: 14px; color: #fff; background: linear-gradient(130deg, #4c6ef5, #7950f2); box-shadow: 0 4px 0 #364fc7;
+  transition: transform .15s cubic-bezier(.3,1.6,.5,1), opacity .15s; }
+.hist-btn:hover:not(:disabled) { transform: translateY(-2px); }
+.hist-btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 #364fc7; }
+.hist-btn:disabled { opacity: .35; cursor: default; filter: grayscale(.6); }
+.hist-arrow { font-size: 1.3rem; line-height: 1; }
+.hist-mid { flex: 1; text-align: center; font-size: .78rem; font-weight: 700; color: var(--muted); }
+section.reviewing > :not(.practice-head):not(.pbar):not(.hist-nav):not(.rv-panel) { display: none !important; }
+.rv-panel.hidden { display: none; }
+.rv-panel { display: flex; flex-direction: column; gap: 12px; align-items: stretch; touch-action: pan-y; }
+.rv-card { position: relative; padding: 18px; border-radius: 22px; background: var(--card); border: 3px solid var(--border); overflow: hidden;
+  box-shadow: 0 6px 0 var(--border), 0 12px 24px rgba(0,0,0,.1); }
+.rv-card.ok { border-color: var(--good); box-shadow: 0 6px 0 #237032, 0 12px 24px rgba(47,158,68,.15); }
+.rv-card.bad { border-color: var(--bad); box-shadow: 0 6px 0 #8f2a20, 0 12px 24px rgba(192,57,43,.15); }
+.rv-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.rv-badge { padding: 4px 12px; border-radius: 999px; font-weight: 900; color: #fff; background: var(--good); }
+.rv-card.bad .rv-badge { background: var(--bad); }
+.rv-label { color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; font-size: .72rem; }
+.rv-q { font-size: 1.4rem; font-weight: 800; margin-bottom: 14px; overflow-wrap: anywhere; }
+.rv-row { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 14px; margin-top: 8px; overflow-wrap: anywhere; }
+.rv-row small { font-weight: 800; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; opacity: .8; }
+.rv-row span { font-size: 1.1rem; font-weight: 700; }
+.rv-row.yours { background: rgba(192,57,43,.1); }
+.rv-card.ok .rv-row.yours { background: rgba(39,174,96,.12); }
+.rv-row.right { background: rgba(39,174,96,.15); }
+.rv-note { margin-top: 10px; font-size: .9rem; color: var(--muted); }
+.rv-return { align-self: center; border: 0; cursor: pointer; font: inherit; font-weight: 900; color: #fff; padding: 12px 22px; border-radius: 16px;
+  background: linear-gradient(120deg, #2f9e44, #20c997); box-shadow: 0 5px 0 #237032; }
+.rv-from-left { animation: rvLeft .3s cubic-bezier(.2,1.2,.4,1); }
+.rv-from-right { animation: rvRight .3s cubic-bezier(.2,1.2,.4,1); }
+@keyframes rvLeft { from { transform: translateX(-40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes rvRight { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+html, body { overscroll-behavior-x: none; }   /* svep i sidled ska inte backa webbläsaren */
+.kd-btn .kd-btn-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.kd-btn > span.kd-btn-go.kd-btn-go { flex: none; display: grid; width: 40px; height: 40px; }
