@@ -1,5 +1,5 @@
 // =====================================================================
-//  Maskoten Lía (ett litet lodjur), mynt, butik, inventory och utmaningar
+//  Maskoten Lía (en liten uggla – smart som en uggla), mynt, butik, inventory och utmaningar
 // =====================================================================
 // Laddas sist. Allt som anropas från app.js/adventure.js/sync.js är skyddat med typeof,
 // så appen fungerar även om den här filen inte finns.
@@ -249,7 +249,7 @@ function mascotAward({ ok, mult = 1, mastered, goalReached, firstToday }) {
     const s = currentStreak(), b = 5 + Math.min(s, 10);
     c += b;
     mascotEvent(s >= 2
-      ? { mood: "proud", title: `🔥 ${s} dagar i rad!`, text: mPick(["Streaken lever! Fortsätt så här!", "Du är ostoppbar! Vi ses imorgon också 😼", `🔥 Det här är vanan som gör dig grym på ${cfg().name.toLowerCase()}.`]), coins: b, big: true }
+      ? { mood: "proud", title: `🔥 ${s} dagar i rad!`, text: mPick(["Streaken lever! Fortsätt så här!", "Du är ostoppbar! Vi ses imorgon också 🦉", `🔥 Det här är vanan som gör dig grym på ${cfg().name.toLowerCase()}.`]), coins: b, big: true }
       : { mood: "happy", title: "🔥 Dagens första svar!", text: "Streaken är igång. Kom tillbaka imorgon så växer den!", coins: b });
   }
   if (goalReached) {
@@ -274,29 +274,33 @@ const MOODS = {
   think: { eyes: "open", mouth: "flat", brows: "think", fx: "think" },
   shock: { eyes: "shock", mouth: "o", fx: "sweat" }
 };
-const INK = "#2a1d15", FUR = "#f0b066", FUR2 = "#e39b4f", CREAM = "#fff4e2", SPOT = "#c98242";
+// Ugglan: naturliga bruna färger, stora bärnstensgula ögon och fjädertofsar – "smart som en uggla"
+const INK = "#2a1a10", FEATH = "#8a5a36", FEATH2 = "#6b4226", FACE = "#efdcb6", RIM = "#b8875a", BELLY = "#f4e6c8", MARK = "#b48455", BEAKC = "#f2a516";
+const EYE_RIM = (cx) => `<circle cx="${cx}" cy="81" r="15.5" fill="#fffaf0" stroke="#5a3a22" stroke-width="2"/>`;
 const EYES = {
-  open: `<g class="m-blink"><ellipse cx="78" cy="80" rx="11" ry="13" fill="#fff"/><ellipse cx="122" cy="80" rx="11" ry="13" fill="#fff"/><g class="m-pupils"><circle cx="79" cy="82" r="7" fill="${INK}"/><circle cx="121" cy="82" r="7" fill="${INK}"/><circle cx="81.5" cy="79" r="2.4" fill="#fff"/><circle cx="123.5" cy="79" r="2.4" fill="#fff"/></g></g>`,
-  happy: `<path d="M67 84 Q78 70 89 84 M111 84 Q122 70 133 84" stroke="${INK}" stroke-width="4.5" fill="none" stroke-linecap="round"/>`,
-  closed: `<path d="M67 81 Q78 88 89 81 M111 81 Q122 88 133 81" stroke="${INK}" stroke-width="4" fill="none" stroke-linecap="round"/>`,
-  sad: `<ellipse cx="78" cy="82" rx="10" ry="11" fill="#fff"/><ellipse cx="122" cy="82" rx="10" ry="11" fill="#fff"/><circle cx="78" cy="86" r="6" fill="${INK}"/><circle cx="122" cy="86" r="6" fill="${INK}"/><circle cx="80" cy="84" r="2" fill="#fff"/><circle cx="124" cy="84" r="2" fill="#fff"/>`,
-  star: `<path d="${mStar(78, 80, 13)}" fill="#ffd43b" stroke="#e8a200" stroke-width="2" stroke-linejoin="round"/><path d="${mStar(122, 80, 13)}" fill="#ffd43b" stroke="#e8a200" stroke-width="2" stroke-linejoin="round"/>`,
-  heart: `<path d="${mHeart(78, 82, 11)}" fill="#ff4d6d"/><path d="${mHeart(122, 82, 11)}" fill="#ff4d6d"/>`,
-  shock: `<circle cx="78" cy="80" r="13" fill="#fff" stroke="${INK}" stroke-width="1.5"/><circle cx="122" cy="80" r="13" fill="#fff" stroke="${INK}" stroke-width="1.5"/><circle cx="78" cy="80" r="4" fill="${INK}"/><circle cx="122" cy="80" r="4" fill="${INK}"/>`
+  open: `<g class="m-blink">${EYE_RIM(78)}${EYE_RIM(122)}<circle cx="78" cy="81" r="10.5" fill="#f2a516"/><circle cx="122" cy="81" r="10.5" fill="#f2a516"/><g class="m-pupils"><circle cx="78.5" cy="82" r="6.5" fill="${INK}"/><circle cx="121.5" cy="82" r="6.5" fill="${INK}"/><circle cx="81.5" cy="78.5" r="2.6" fill="#fff"/><circle cx="124.5" cy="78.5" r="2.6" fill="#fff"/></g></g>`,
+  happy: `<path d="M64 85 Q78 68 92 85 M108 85 Q122 68 136 85" stroke="${INK}" stroke-width="5" fill="none" stroke-linecap="round"/>`,
+  closed: `<path d="M64 82 Q78 91 92 82 M108 82 Q122 91 136 82" stroke="${INK}" stroke-width="4.5" fill="none" stroke-linecap="round"/>`,
+  sad: `${EYE_RIM(78)}${EYE_RIM(122)}<circle cx="78" cy="84" r="9.5" fill="#f2a516"/><circle cx="122" cy="84" r="9.5" fill="#f2a516"/><circle cx="78" cy="86" r="6" fill="${INK}"/><circle cx="122" cy="86" r="6" fill="${INK}"/><circle cx="80.5" cy="84" r="2" fill="#fff"/><circle cx="124.5" cy="84" r="2" fill="#fff"/><path d="M62 79 Q78 66 94 79 Z M106 79 Q122 66 138 79 Z" fill="${FACE}"/>`,
+  star: `<path d="${mStar(78, 81, 15)}" fill="#ffd43b" stroke="#e8a200" stroke-width="2" stroke-linejoin="round"/><path d="${mStar(122, 81, 15)}" fill="#ffd43b" stroke="#e8a200" stroke-width="2" stroke-linejoin="round"/>`,
+  heart: `<path d="${mHeart(78, 83, 12.5)}" fill="#ff4d6d"/><path d="${mHeart(122, 83, 12.5)}" fill="#ff4d6d"/>`,
+  shock: `<circle cx="78" cy="81" r="17" fill="#fff" stroke="#5a3a22" stroke-width="2"/><circle cx="122" cy="81" r="17" fill="#fff" stroke="#5a3a22" stroke-width="2"/><circle cx="78" cy="81" r="6" fill="#f2a516"/><circle cx="122" cy="81" r="6" fill="#f2a516"/><circle cx="78" cy="81" r="3.2" fill="${INK}"/><circle cx="122" cy="81" r="3.2" fill="${INK}"/>`
 };
+// Ugglans "ögonbryn" är fjädrar ovanför ögonen
 const BROWS = {
-  sad: `<path d="M67 70 L87 63 M133 70 L113 63" stroke="${INK}" stroke-width="3.5" stroke-linecap="round"/>`,
-  proud: `<path d="M67 63 L88 66 M112 66 L133 63" stroke="${INK}" stroke-width="3.5" stroke-linecap="round"/>`,
-  think: `<path d="M67 62 Q78 55 89 62 M112 66 L132 66" stroke="${INK}" stroke-width="3.5" stroke-linecap="round" fill="none"/>`
+  sad: `<path d="M64 67 L88 60 M136 67 L112 60" stroke="${FEATH2}" stroke-width="5" stroke-linecap="round"/>`,
+  proud: `<path d="M63 60 L90 64 M110 64 L137 60" stroke="${FEATH2}" stroke-width="5" stroke-linecap="round"/>`,
+  think: `<path d="M63 59 Q78 50 92 58 M110 63 L136 63" stroke="${FEATH2}" stroke-width="5" stroke-linecap="round" fill="none"/>`
 };
-const NOSE_LINE = `<path d="M100 101 V108" stroke="${INK}" stroke-width="3" stroke-linecap="round"/>`;
+// Näbben – stängd eller öppen beroende på humör
+const BEAK = `<path d="M90.5 92 Q100 85.5 109.5 92 Q105.5 101 100 113 Q94.5 101 90.5 92 Z" fill="${BEAKC}" stroke="#b86e0a" stroke-width="1.6" stroke-linejoin="round"/><path d="M95 91.5 Q100 89 105 91.5" stroke="#fff3c4" stroke-width="1.6" fill="none" opacity=".75" stroke-linecap="round"/>`;
+const BEAK_OPEN = (lower) => `<path d="M93.5 103 Q100 100 106.5 103 Q104.5 ${112 + lower} 100 ${116 + lower} Q95.5 ${112 + lower} 93.5 103 Z" fill="#7a2b2b"/><path d="M95 ${108 + lower} Q100 ${106 + lower} 105 ${108 + lower} Q103 ${116 + lower} 100 ${118 + lower} Q97 ${116 + lower} 95 ${108 + lower} Z" fill="#e0961a" stroke="#b86e0a" stroke-width="1.2"/>` +
+  `<path d="M90.5 91 Q100 84.5 109.5 91 Q105.5 98 100 105 Q94.5 98 90.5 91 Z" fill="${BEAKC}" stroke="#b86e0a" stroke-width="1.6" stroke-linejoin="round"/>`;
 const MOUTHS = {
-  smile: NOSE_LINE + `<path d="M88 108 Q94 115 100 108 Q106 115 112 108" stroke="${INK}" stroke-width="3" fill="none" stroke-linecap="round"/>`,
-  big: NOSE_LINE + `<path d="M85 108 H115 Q113 127 100 127 Q87 127 85 108 Z" fill="#7a2b2b"/><path d="M91 121 Q100 114 109 121 Q105 127 100 127 Q95 127 91 121 Z" fill="#ff8a8a"/>`,
-  sad: NOSE_LINE + `<path d="M88 118 Q100 107 112 118" stroke="${INK}" stroke-width="3" fill="none" stroke-linecap="round"/>`,
-  o: NOSE_LINE + `<ellipse cx="100" cy="115" rx="6" ry="7" fill="#7a2b2b"/>`,
-  flat: NOSE_LINE + `<path d="M91 112 H109" stroke="${INK}" stroke-width="3" stroke-linecap="round"/>`,
-  smirk: NOSE_LINE + `<path d="M89 110 Q102 117 114 105" stroke="${INK}" stroke-width="3" fill="none" stroke-linecap="round"/>`
+  smile: BEAK, sad: BEAK, flat: BEAK,
+  smirk: `<g transform="rotate(-6 100 100)">${BEAK}</g>`,
+  big: BEAK_OPEN(3),
+  o: BEAK_OPEN(0)
 };
 const FX = {
   tear: `<path class="m-tear" d="M86 92 Q81 101 86 105 Q91 101 86 92 Z" fill="#74c0fc"/>`,
@@ -317,25 +321,23 @@ function mascotSVG(mood = "idle", equip = getWardrobe().equip) {
 <ellipse class="m-shadow" cx="100" cy="212" rx="50" ry="7" fill="rgba(0,0,0,.16)"/>
 <g class="m-all">
   ${body?.back || ""}
-  <g class="m-tail"><path d="M134 188 Q180 186 172 142 Q170 130 160 133" stroke="${FUR2}" stroke-width="13" fill="none" stroke-linecap="round"/><path d="M169 148 Q170 134 160 133" stroke="#3b2a20" stroke-width="13" fill="none" stroke-linecap="round"/></g>
-  <ellipse cx="80" cy="204" rx="17" ry="9" fill="${FUR2}"/><ellipse cx="120" cy="204" rx="17" ry="9" fill="${FUR2}"/>
-  <path d="M74 206 V211 M80 207 V212 M86 206 V211 M114 206 V211 M120 207 V212 M126 206 V211" stroke="${SPOT}" stroke-width="2" stroke-linecap="round"/>
-  <ellipse cx="100" cy="166" rx="44" ry="40" fill="${FUR}"/>
-  <ellipse cx="100" cy="174" rx="27" ry="27" fill="${CREAM}"/>
-  <circle cx="70" cy="158" r="3.5" fill="${SPOT}"/><circle cx="76" cy="180" r="3" fill="${SPOT}"/><circle cx="130" cy="156" r="3.5" fill="${SPOT}"/><circle cx="124" cy="182" r="3" fill="${SPOT}"/>
+  <g class="m-tail"><path d="M84 194 L91 217 L100 203 L109 217 L116 194 Z" fill="${FEATH2}"/><path d="M91 217 L96 200 M109 217 L104 200" stroke="#4e2f19" stroke-width="1.5"/></g>
+  <ellipse cx="100" cy="166" rx="44" ry="40" fill="${FEATH}"/>
+  <ellipse cx="100" cy="173" rx="29" ry="29" fill="${BELLY}"/>
+  <path d="M88 158 l4 4 l4 -4 M104 158 l4 4 l4 -4 M80 172 l4 4 l4 -4 M96 172 l4 4 l4 -4 M112 172 l4 4 l4 -4 M88 186 l4 4 l4 -4 M104 186 l4 4 l4 -4" stroke="${MARK}" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <g class="m-feet"><path d="M70 203 Q80 197 90 203 Q86 209 80 209 Q74 209 70 203 Z M110 203 Q120 197 130 203 Q126 209 120 209 Q114 209 110 203 Z" fill="#e8a33d"/><path d="M76 205 V211 M80 205 V212 M84 205 V211 M116 205 V211 M120 205 V212 M124 205 V211" stroke="#9a6414" stroke-width="2" stroke-linecap="round"/></g>
   ${svg(body)}
-  <g class="m-arm m-arm-l"><ellipse cx="60" cy="166" rx="11" ry="20" transform="rotate(18 60 166)" fill="${FUR}"/></g>
-  <g class="m-arm m-arm-r"><ellipse cx="140" cy="166" rx="11" ry="20" transform="rotate(-18 140 166)" fill="${FUR}"/>${svg(part("hand"))}</g>
+  <g class="m-arm m-arm-l"><g transform="rotate(18 60 166)"><ellipse cx="60" cy="166" rx="13" ry="24" fill="${FEATH2}"/><path d="M55 158 Q58 172 56 184 M62 156 Q65 172 63 186" stroke="#4e2f19" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".7"/></g></g>
+  <g class="m-arm m-arm-r"><g transform="rotate(-18 140 166)"><ellipse cx="140" cy="166" rx="13" ry="24" fill="${FEATH2}"/><path d="M145 158 Q142 172 144 184 M138 156 Q135 172 137 186" stroke="#4e2f19" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".7"/></g>${svg(part("hand"))}</g>
   <g class="m-head">
-    <g class="m-ear m-ear-l"><path d="M50 58 L60 6 L92 36 Z" fill="${FUR}" stroke="${FUR}" stroke-width="6" stroke-linejoin="round"/><path d="M59 47 L63 21 L81 38 Z" fill="#f6c3b5"/><path d="M60 6 L56 -11" stroke="#3b2a20" stroke-width="5" stroke-linecap="round"/></g>
-    <g class="m-ear m-ear-r"><path d="M150 58 L140 6 L108 36 Z" fill="${FUR}" stroke="${FUR}" stroke-width="6" stroke-linejoin="round"/><path d="M141 47 L137 21 L119 38 Z" fill="#f6c3b5"/><path d="M140 6 L144 -11" stroke="#3b2a20" stroke-width="5" stroke-linecap="round"/></g>
-    <path d="M46 82 L24 116 L52 108 L44 128 L72 112 Z" fill="${FUR}"/><path d="M154 82 L176 116 L148 108 L156 128 L128 112 Z" fill="${FUR}"/>
-    <ellipse cx="100" cy="80" rx="60" ry="52" fill="${FUR}"/>
-    <path d="M92 34 L94 46 M100 32 V46 M108 34 L106 46 M44 74 L56 76 M44 86 L56 84 M156 74 L144 76 M156 86 L144 84" stroke="${SPOT}" stroke-width="3.5" stroke-linecap="round"/>
-    <ellipse cx="100" cy="105" rx="27" ry="18" fill="${CREAM}"/>
-    <circle cx="62" cy="100" r="9" fill="#ff8f8f" opacity=".45"/><circle cx="138" cy="100" r="9" fill="#ff8f8f" opacity=".45"/>
+    <g class="m-ear m-ear-l"><path d="M56 52 Q50 22 58 2 Q70 22 86 40 Z" fill="${FEATH2}"/><path d="M60 42 Q57 24 60 12 Q67 26 76 38 Z" fill="${MARK}" opacity=".7"/></g>
+    <g class="m-ear m-ear-r"><path d="M144 52 Q150 22 142 2 Q130 22 114 40 Z" fill="${FEATH2}"/><path d="M140 42 Q143 24 140 12 Q133 26 124 38 Z" fill="${MARK}" opacity=".7"/></g>
+    <ellipse cx="100" cy="80" rx="60" ry="52" fill="${FEATH}"/>
+    <circle cx="80" cy="38" r="2.2" fill="${MARK}"/><circle cx="92" cy="33" r="2.2" fill="${MARK}"/><circle cx="108" cy="33" r="2.2" fill="${MARK}"/><circle cx="120" cy="38" r="2.2" fill="${MARK}"/><circle cx="100" cy="40" r="2.2" fill="${MARK}"/>
+    <path d="M100 58 C88 48 50 52 50 82 C50 110 82 116 100 106 C118 116 150 110 150 82 C150 52 112 48 100 58 Z" fill="${FACE}" stroke="${RIM}" stroke-width="3"/>
+    <path d="M100 60 V90" stroke="${RIM}" stroke-width="2" opacity=".5" stroke-linecap="round"/>
+    <circle cx="60" cy="100" r="8" fill="#ff8f8f" opacity=".35"/><circle cx="140" cy="100" r="8" fill="#ff8f8f" opacity=".35"/>
     ${EYES[m.eyes]}${BROWS[m.brows] || ""}
-    <path d="M93 95 Q100 91 107 95 Q100 104 93 95 Z" fill="#4a2f25"/>
     ${MOUTHS[m.mouth]}
     ${svg(part("face"))}${svg(part("head"))}
     ${m.fx === "tear" || m.fx === "sweat" ? FX[m.fx] : ""}
@@ -440,13 +442,13 @@ function homeMood() {
   if (h >= 23 || h < 5) return ["sleepy", today ? "Zzz… bra jobbat idag. Dags att sova? 😴" : "Zzz… det är sent. Ett par kort och sen sängen?"];
   if (!today && h >= 17 && st > 0) return ["sad", `Vi har inte övat idag än 🥺 Din streak på ${st} ${st === 1 ? "dag" : "dagar"} vill inte brinna ut!`];
   if (!today) return ["wave", mPick([`${phr("hi")} Jag är ${name}. Ska vi köra en runda?`, `${phr("morning")} Redo för lite ${cfg().name.toLowerCase()}?`, "Hej igen! Dina kort längtar efter dig 📚"])];
-  if (today >= goal) return ["proud", mPick(["Dagsmålet är klart! 🎯 Du är grym.", `${phrPick("praise")} Allt du gör nu är bonus 😼`])];
+  if (today >= goal) return ["proud", mPick(["Dagsmålet är klart! 🎯 Du är grym.", `${phrPick("praise")} Allt du gör nu är bonus 🦉`])];
   return ["happy", `${today}/${goal} kort idag – ${goal - today} kvar till dagsmålet!`];
 }
 // Vad hon säger när du klappar henne – på konfigens språk, svenska för ämnen
 function tapLines() {
-  const base = ["Pssst… butiken har nya grejer 👀", "Jag är ett iberiskt lodjur, världens coolaste katt 😼", "Mjau! 🐾", phr("hi"), ...phr("cheer")];
-  if (phraseLang() === "es") base.push("¡Qué guay!", "¿Qué tal?", "Miau… menar jag, ¡olé!");
+  const base = ["Pssst… butiken har nya grejer 👀", "Smart som en uggla – det är du också snart 🦉", "Hoo-hoo! 🦉", "Visste du att ugglor kan vrida huvudet nästan ett helt varv? 🦉", phr("hi"), ...phr("cheer")];
+  if (phraseLang() === "es") base.push("¡Qué guay!", "¿Qué tal?", "¡Uhu! … menar jag, ¡olé!");
   return base;
 }
 
@@ -495,7 +497,7 @@ function refreshMascotBits() {
 // ---------- Vyn: inventory, butik och utmaningar ----------
 let mvRefresh = null;
 function showMascot(tab = "inv") {
-  titleEl.textContent = `${mascotName()} 🐾`;
+  titleEl.textContent = `${mascotName()} 🦉`;
   goBack = showHome; reopen = () => showMascot(tab);
   render("tpl-mascot", "mascot");
   let filter = "all", tryOn = null;      // tryOn = pryl du provar i butiken
@@ -642,7 +644,7 @@ function showMascot(tab = "inv") {
     const n = prompt("Vad ska din maskot heta?", mascotName());
     if (n === null) return;
     const w = getWardrobe(); w.name = n.trim().slice(0, 20) || MASCOT_DEFAULT_NAME; saveWardrobe(w);
-    titleEl.textContent = `${w.name} 🐾`; drawStage();
+    titleEl.textContent = `${w.name} 🦉`; drawStage();
   };
   fig.onclick = () => { setMood(fig, mPick(["happy", "love", "wave", "celebrate"]), equipWith()); setTimeout(() => alive(fig) && setMood(fig, stageMood(), equipWith()), 1800); };
   mvRefresh = drawTabs;
@@ -701,8 +703,8 @@ function mascotGreet(afterLogin = false) {
 (function mascotInit() {
   const first = mascotFirstRun();
   if (first) {
-    mascotEvent({ mood: "wave", big: true, title: `${phr("hi")} Jag är ${MASCOT_DEFAULT_NAME} 🐾`,
-      text: "Ett litet iberiskt lodjur som pluggar med dig. Du tjänar 🪙 mynt när du övar – köp kläder till mig i butiken och lås upp specialprylar med märken och utmaningar!",
+    mascotEvent({ mood: "wave", big: true, title: `${phr("hi")} Jag är ${MASCOT_DEFAULT_NAME} 🦉`,
+      text: "En liten uggla som pluggar med dig – smart som en uggla! Du tjänar 🪙 mynt när du övar – köp kläder till mig i butiken och lås upp specialprylar med märken och utmaningar!",
       coins: coinsEarned(), button: phr("go") });
     mascotIntroShown = true;
     save("app.mGreet", todayKey());
