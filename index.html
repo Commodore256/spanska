@@ -129,6 +129,12 @@
       </form>
       <button id="btnImport" class="btn import-btn">Importera flashcards från text 📋</button>
 
+      <div class="search-row">
+        <label class="search-box"><span aria-hidden="true">🔍</span>
+          <input id="cardSearch" type="search" placeholder="Sök bland korten (fråga och svar)…" autocomplete="off" spellcheck="false" aria-label="Sök bland korten">
+        </label>
+        <button id="btnDupes" class="btn-small dupes-btn" type="button" title="Låt AI:n leta efter kort som är dubletter">🤖 Hitta dubletter</button>
+      </div>
       <div class="filters" id="filters">
         <button data-filter="all" class="chip active">Alla</button>
         <button data-filter="warn" class="chip yellow">🟡 Att rätta</button>
@@ -312,6 +318,16 @@
         <button id="btnJudgeYes" class="btn good">✓ Jag hade rätt</button>
       </div>
       <div class="row"><button id="btnNext" class="btn secondary hidden">Nästa →</button></div>
+    </section>
+  </template>
+
+  <!-- Dubletter som AI:n har hittat -->
+  <template id="tpl-dupes">
+    <section class="dupes">
+      <p id="dupInfo" class="muted"></p>
+      <div class="row tight"><button id="btnDupScan" class="btn secondary">🤖 Skanna igen</button></div>
+      <div class="dup-head"><span>Kort 1</span><span>Kort 2</span></div>
+      <div id="dupList" class="dup-list"></div>
     </section>
   </template>
 

@@ -84,7 +84,7 @@ function saveConfigs() { save("app.configs", configs); }
 // =====================================================================
 //  Data för aktiv konfig
 // =====================================================================
-let progress = {}, hidden = {}, cards = [], listFilter = "all", listSort = "new";
+let progress = {}, hidden = {}, cards = [], listFilter = "all", listSort = "new", listSearch = "";
 let cats = [], listCat = "all";   // kategorier i Mina kort och vald kategori ("all", "none" eller id)
 
 function getBox(deckId, es) { return (progress[deckId] && progress[deckId][es]) || 0; }
@@ -1006,8 +1006,12 @@ function filteredCards() {
     sv: (a, b) => coll(a, b, "sv", "sv"),
     es: (a, b) => coll(a, b, "es", "es")
   }[listSort] || (() => 0);
-  return cards.filter(c => inCat(c, listCat) && f(c)).sort(s);
+  const q = searchNorm(listSearch);
+  const hit = c => !q || searchNorm(c.sv).includes(q) || searchNorm(c.es).includes(q);
+  return cards.filter(c => inCat(c, listCat) && f(c) && hit(c)).sort(s);
 }
+// Sökningen bryr sig inte om stora/små bokstäver eller accenter
+function searchNorm(s) { return stripAccents(String(s || "").toLowerCase()).replace(/\s+/g, " ").trim(); }
 
 function showMyCards() {
   titleEl.textContent = "Mina kort";
@@ -1070,6 +1074,14 @@ function showMyCards() {
       renderCardList();
     };
   });
+  // Sök
+  const search = $("#cardSearch");
+  search.value = listSearch;
+  let searchT = null;
+  search.oninput = () => { clearTimeout(searchT); searchT = setTimeout(() => { listSearch = search.value; renderCardList(); }, 120); };
+  search.onkeydown = e => { if (e.key === "Escape") { search.value = ""; listSearch = ""; renderCardList(); } };
+  $("#btnDupes").onclick = () => showDupes(true);
+
   const sortSel = $("#sortSel");
   sortSel.value = listSort;
   sortSel.onchange = () => { listSort = sortSel.value; save(lsKey("sort"), listSort); renderCardList(); };
@@ -1102,7 +1114,7 @@ function renderCardList() {
   if (!ul) return;
   updateAiStatus();
   const list = filteredCards();
-  $("#listCount").textContent = `${list.length} av ${cards.length} kort`;
+  $("#listCount").textContent = `${list.length} av ${cards.length} kort` + (listSearch.trim() ? ` · sökning ”${listSearch.trim()}”` : "");
   const bulk = view.querySelector("#btnAiAll");
   if (bulk) {
     bulk.classList.toggle("hidden", listFilter !== "noai" || !list.length);
@@ -1119,7 +1131,8 @@ function renderCardList() {
   }
   ul.innerHTML = "";
   if (!list.length) {
-    ul.append(el("li", "empty muted", cards.length ? "Inga kort matchar filtret." : "Inga kort än. Skriv ett ord ovanför!"));
+    ul.append(el("li", "empty muted", !cards.length ? "Inga kort än. Skriv ett ord ovanför!"
+      : listSearch.trim() ? `Inga kort innehåller ”${listSearch.trim()}”.` : "Inga kort matchar filtret."));
     return;
   }
   for (const c of list) {
@@ -1265,6 +1278,119 @@ function toggleYellow(c) {
   return isWarn(c);
 }
 function deleteCard(c) { cards = cards.filter(x => x.id !== c.id); saveCards(); }
+
+// =====================================================================
+//  Dubletter: AI:n föreslår par, du tar själv bort det du vill
+// =====================================================================
+async function aiFindDupes(list, c = cfg()) {
+  const ai = aiConfig();
+  return fetchJson(ai.url.replace(/\/+$/, ""), {
+    method: "POST", headers: aiHeaders(ai),
+    body: JSON.stringify({ mode: "dupes", cards: list, cfg: aiCfgPayload(c) })
+  }, 90000);
+}
+const DUPE_BATCH = 400;
+function pairKey(a, b) { return [a, b].sort().join("|"); }
+function showDupes(doScan = false) {
+  titleEl.textContent = "Dubletter";
+  goBack = showMyCards; reopen = () => showDupes(false);
+  render("tpl-dupes", "dupes");
+  const info = $("#dupInfo"), listEl = $("#dupList"), btnScan = $("#btnDupScan");
+  const stored = () => load(lsKey("dupes"), null) || { pairs: [], dismissed: {} };
+
+  function draw() {
+    const d = stored(), byId = new Map(cards.map(c => [c.id, c]));
+    const pairs = (d.pairs || []).filter(p => byId.has(p.a) && byId.has(p.b) && !d.dismissed?.[pairKey(p.a, p.b)]);
+    listEl.innerHTML = "";
+    view.querySelector(".dup-head").classList.toggle("hidden", !pairs.length);
+    if (!d.at) { info.textContent = "AI:n har inte letat efter dubletter än."; return; }
+    info.textContent = pairs.length
+      ? `AI:n tror att de här ${pairs.length === 1 ? "två korten är dubletter" : pairs.length + " paren är dubletter"}. Ta bort det kort du inte vill ha – eller tryck ”Inte dubletter”. Skannat ${dateLabel(new Date(d.at))} ${new Date(d.at).toTimeString().slice(0, 5)} (${d.count} kort).`
+      : `🎉 Inga dubletter kvar bland dina ${cards.length} kort. Skannat ${dateLabel(new Date(d.at))} ${new Date(d.at).toTimeString().slice(0, 5)}.`;
+    pairs.forEach((p, i) => {
+      const row = el("div", "dup-row");
+      row.style.setProperty("--i", i);
+      const pair = el("div", "dup-pair");
+      for (const id of [p.a, p.b]) {
+        const c = byId.get(id), box = el("div", "dup-card");
+        box.append(el("b", "", c.sv || "—"), el("span", "", c.es || "—"));
+        const meta = el("small", "muted", `Övad ${c.seen || 0} · ✓ ${c.right || 0} · ✗ ${c.wrong || 0}` + (c.created ? ` · ${dateLabel(new Date(c.created))}` : ""));
+        const del = el("button", "btn-small bad dup-del", "🗑 Ta bort");
+        del.onclick = async () => {
+          const yes = await confirmDialog({ title: "Ta bort kortet?", icon: "🗑️", danger: true, ok: "Ta bort", cancel: "Behåll",
+            text: `”${c.sv} – ${c.es}” tas bort. Det andra kortet finns kvar.` });
+          if (!yes) return;
+          deleteCard(c);
+          toast("🗑 Kortet är borttaget");
+          draw();
+        };
+        box.append(meta, del);
+        pair.append(box);
+      }
+      row.append(pair);
+      const foot = el("div", "dup-foot");
+      foot.append(el("small", "dup-reason", "🤖 " + (p.reason || "Liknar varandra")));
+      const keep = el("button", "btn-small", "Inte dubletter");
+      keep.title = "Behåll båda – visa inte paret igen";
+      keep.onclick = () => { const d2 = stored(); d2.dismissed = d2.dismissed || {}; d2.dismissed[pairKey(p.a, p.b)] = 1; save(lsKey("dupes"), d2); draw(); };
+      foot.append(keep);
+      row.append(foot);
+      listEl.append(row);
+    });
+  }
+
+  async function scan() {
+    if (!aiEnabled()) { info.textContent = "AI:n är inte kopplad – logga in eller fyll i AI-koppling under ⚙."; return; }
+    if (!navigator.onLine) { info.textContent = "Du är offline – AI:n kan inte skanna just nu."; return; }
+    const usable = cards.filter(c => c.sv || c.es);
+    if (usable.length < 2) { info.textContent = "Du behöver minst två kort."; return; }
+    btnScan.disabled = true; listEl.innerHTML = "";
+    view.querySelector(".dup-head").classList.add("hidden");
+    // Sorterat i bokstavsordning så att liknande kort hamnar i samma omgång
+    const sorted = [...usable].sort((a, b) => searchNorm(a.sv || a.es).localeCompare(searchNorm(b.sv || b.es), "sv"));
+    const idx = sorted.map(c => c.id);
+    const found = new Map();
+    // Exakt samma text (utan accenter, artiklar och skiljetecken) hittas direkt, utan AI
+    const plain = s => searchNorm(s).replace(/^(att|en|ett|el|la|los|las|un|una|the|a|an|to|der|die|das|le|les|il)\s+/, "").replace(/[^\p{L}\p{N} ]/gu, "").trim();
+    for (const side of ["sv", "es"]) {
+      const seen = new Map();
+      for (const c of sorted) {
+        const k = plain(c[side]);
+        if (!k) continue;
+        if (seen.has(k)) found.set(pairKey(seen.get(k), c.id), { a: seen.get(k), b: c.id, reason: `Samma ${side === "sv" ? sideLabels().sv.toLowerCase() : sideLabels().es.toLowerCase()}` });
+        else seen.set(k, c.id);
+      }
+    }
+    try {
+      for (let start = 0; start < sorted.length; start += DUPE_BATCH) {
+        const part = sorted.slice(start, start + DUPE_BATCH);
+        info.textContent = `🤖 AI:n letar efter dubletter bland ${usable.length} kort` + (sorted.length > DUPE_BATCH ? ` (del ${start / DUPE_BATCH + 1} av ${Math.ceil(sorted.length / DUPE_BATCH)})` : "") + "… det kan ta en halv minut.";
+        const r = await aiFindDupes(part.map((c, i) => ({ i: start + i, f: c.sv || "", b: c.es || "" })));
+        if (!alive(info)) return;
+        for (const p of r.pairs || []) {
+          const a = idx[p.a], b = idx[p.b];
+          if (a && b && a !== b) found.set(pairKey(a, b), { a, b, reason: p.reason || "" });
+        }
+      }
+      const d = stored();
+      save(lsKey("dupes"), { at: Date.now(), count: usable.length, pairs: [...found.values()], dismissed: d.dismissed || {} });
+    } catch (err) {
+      if (!alive(info)) return;
+      info.textContent = "⚠ AI:n kunde inte skanna: " + (err.message || err) + (found.size ? " – visar bara exakta dubletter." : "");
+      if (found.size) save(lsKey("dupes"), { ...stored(), at: Date.now(), count: usable.length, pairs: [...found.values()] });
+      btnScan.disabled = false;
+      if (found.size) { const msg = info.textContent; draw(); info.textContent = msg; }
+      return;
+    }
+    btnScan.disabled = false;
+    draw();
+    const n = view.querySelectorAll(".dup-row").length;
+    toast(n ? `🤖 Hittade ${n} möjliga dubletter` : "🎉 Inga dubletter hittades");
+  }
+  btnScan.onclick = scan;
+  draw();
+  if (doScan === true || !stored().at) scan();
+}
 
 // Meddelanden visas ett i taget, i tur och ordning
 const toastQueue = [];
