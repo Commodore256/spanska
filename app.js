@@ -1889,7 +1889,7 @@ let histSwipe = null;
   let sx = null, sy = 0;
   document.addEventListener("touchstart", e => {
     if (!histSwipe || !alive(histSwipe.section) || e.touches.length !== 1 ||
-        e.target.closest("input, textarea, select, .mem-slider, .dir3, .drawer, .mpop-bg, .cdlg-bg")) { sx = null; return; }
+        e.target.closest("input, textarea, select, .mem-slider, .dir3, .drawer, .mpop-bg, .cdlg-bg, .chat-panel, .chat-fab")) { sx = null; return; }
     sx = e.touches[0].clientX; sy = e.touches[0].clientY;
   }, { passive: true });
   document.addEventListener("touchend", e => {
