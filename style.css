@@ -1702,3 +1702,6 @@ html, body { overscroll-behavior-x: none; }   /* svep i sidled ska inte backa we
 .kd-btn.play.go-blue { background: linear-gradient(115deg, #2f9e44 0%, #12b886 40%, #1c7ed6 100%); box-shadow: 0 6px 0 #1864ab, 0 12px 22px rgba(28,126,214,.3); }
 .mycards .practice-row { margin: 4px 0 4px; }
 .mycards #practiceInfo { margin: 6px 0 12px; }
+/* Sökträffar i Mina kort (som Ctrl+F) */
+mark.hl { background: #ffe066; color: #3b2a00; border-radius: 4px; padding: 0 2px; margin: 0 -1px; box-shadow: 0 0 0 1px #fcc419; font-weight: inherit; }
+[data-theme="dark"] mark.hl { background: #fcc419; color: #1a1300; }

@@ -1143,11 +1143,36 @@ function renderCardList() {
       : listSearch.trim() ? `Inga kort innehåller ”${listSearch.trim()}”.` : "Inga kort matchar filtret."));
     return;
   }
+  const q = searchNorm(listSearch);
   for (const c of list) {
     const row = c.id === editingId ? cardEditRow(c) : cardRow(c);
     if (c.id === justAdded) playClass(row, "row-new");
+    // Markera sökordet i korten, som Ctrl+F (bara visuellt – sparas inte)
+    if (q && c.id !== editingId) row.querySelectorAll(".cols .sv, .cols .es").forEach(x => markMatches(x, q));
     ul.append(row);
   }
+}
+// Lägger <mark> runt varje träff i texten. Bryr sig inte om stora/små bokstäver eller accenter.
+function markMatches(elem, q) {
+  const tn = [...elem.childNodes].find(n => n.nodeType === 3 && n.nodeValue.trim());
+  if (!tn || !q) return;
+  const text = tn.nodeValue;
+  let norm = "";
+  const map = [];   // map[i] = position i originaltexten för tecken i i den normaliserade texten
+  for (let i = 0; i < text.length; i++) {
+    const n = stripAccents(text[i].toLowerCase());
+    for (let k = 0; k < n.length; k++) { norm += n[k]; map.push(i); }
+  }
+  const parts = [];
+  let from = 0, pos = norm.indexOf(q);
+  if (pos < 0) return;
+  while (pos >= 0) {
+    const start = map[pos], end = map[pos + q.length - 1] + 1;
+    if (start >= from) { parts.push(text.slice(from, start)); const m = document.createElement("mark"); m.className = "hl"; m.textContent = text.slice(start, end); parts.push(m); from = end; }
+    pos = norm.indexOf(q, pos + q.length);
+  }
+  parts.push(text.slice(from));
+  tn.replaceWith(...parts);
 }
 
 function cardRow(c) {
