@@ -406,6 +406,60 @@
     </section>
   </template>
 
+  <!-- Bakgrund -->
+  <template id="tpl-bg">
+    <section class="bgv">
+      <div id="bgPreview" class="bg-preview">
+        <div class="bgp-fill"></div>
+        <div class="bgp-bar"></div>
+        <div class="bgp-card c1"></div><div class="bgp-card c2"></div><div class="bgp-card c3"></div>
+        <span class="bgp-label">Förhandsvisning</span>
+      </div>
+
+      <div class="setting-row bg-scope">
+        <span class="setting-text"><b>🎯 Bara den här konfigen</b><small id="bgScopeText" class="muted"></small></span>
+        <label class="switch"><input id="bgScope" type="checkbox" role="switch" aria-label="Bara den här konfigen"><span class="slider"></span></label>
+      </div>
+
+      <h3 class="bg-h">Typ av bakgrund</h3>
+      <div id="bgTypes" class="bg-types"></div>
+
+      <div id="bgSolid" class="bg-sect hidden">
+        <h3 class="bg-h">Färg</h3>
+        <div id="bgSolidColors" class="bg-colors"></div>
+      </div>
+
+      <div id="bgGrad" class="bg-sect hidden">
+        <h3 class="bg-h">Färg 1 <button id="bgSwap" class="bg-swap" type="button" title="Byt plats på färgerna">⇅ Byt plats</button></h3>
+        <div id="bgC1" class="bg-colors"></div>
+        <h3 class="bg-h">Färg 2</h3>
+        <div id="bgC2" class="bg-colors"></div>
+        <h3 class="bg-h">Hur ska färgerna tona?</h3>
+        <div id="bgStyles" class="bg-styles"></div>
+      </div>
+
+      <div id="bgImage" class="bg-sect hidden">
+        <h3 class="bg-h">Egen bild</h3>
+        <div class="bg-img-row">
+          <button id="bgImgThumb" class="bg-img-thumb empty" type="button" title="Byt bild"></button>
+          <div class="bg-img-actions">
+            <button id="bgPickImg" class="kd-btn import" type="button"><span class="kd-btn-icon" data-ic="download"></span><span class="kd-btn-text"><b>Välj en bild</b><small>PNG eller JPG från datorn eller mobilen</small></span></button>
+            <button id="bgImgRemove" class="btn-small bad hidden" type="button">🗑 Ta bort bilden</button>
+          </div>
+        </div>
+        <p class="muted small">Bilden sparas bara på den här enheten, eftersom bilder är för stora för att synkas med kontot.</p>
+        <input id="bgFile" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+      </div>
+
+      <div id="bgFrostRow" class="setting-row bg-frost hidden">
+        <span class="setting-text"><b>❄️ Frostad effekt</b><small class="muted">Suddar ut och ljusar upp bakgrunden, som frostat glas – texten blir lättare att läsa</small></span>
+        <label class="switch"><input id="bgFrost" type="checkbox" role="switch" aria-label="Frostad effekt"><span class="slider"></span></label>
+      </div>
+
+      <div class="row"><button id="bgReset" class="btn secondary" type="button">↺ Återställ till standard</button></div>
+    </section>
+  </template>
+
   <template id="tpl-list">
     <section class="list">
       <ul id="wordList" class="word-list"></ul>
@@ -424,6 +478,7 @@
       </div>
 
       <h2>Utseende</h2>
+      <button id="btnBg" class="kd-btn bg-btn" type="button"><span class="kd-btn-icon" data-ic="palette"></span><span class="kd-btn-text"><b>Bakgrund</b><small>Färger, toningar, egen bild och frostad effekt</small></span><span class="kd-btn-go" data-ic="arrow"></span></button>
       <div class="setting-row">
         <span class="setting-text"><b>🌙 Mörkt läge</b><small class="muted">Mörk bakgrund och ljus text</small></span>
         <label class="switch"><input id="darkToggle" type="checkbox" role="switch" aria-label="Mörkt läge"><span class="slider"></span></label>
@@ -790,6 +845,7 @@
   <script src="adventure.js"></script>
   <script src="mascot.js"></script>
   <script src="decks.js"></script>
+  <script src="bg.js"></script>
   <script src="chat.js"></script>
 </body>
 </html>

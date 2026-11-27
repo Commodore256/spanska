@@ -16,7 +16,8 @@ const SYNC_SAFE_VIEWS = new Set(["home", "mycards", "adv", "ach", "settings", "d
 function syncOn() { return typeof WORKER_URL === "string" && !!WORKER_URL.trim(); }
 function syncToken() { return load("sync.token", null); }
 function isSyncedKey(k) {
-  return !!k && SYNC_PREFIXES.some(p => k.startsWith(p)) && !SYNC_DEVICE_ONLY.has(k) && !SYNC_DEVICE_SUFFIX.some(s => k.endsWith(s));
+  return !!k && SYNC_PREFIXES.some(p => k.startsWith(p)) && !SYNC_DEVICE_ONLY.has(k) && !SYNC_DEVICE_SUFFIX.some(s => k.endsWith(s))
+    && !k.startsWith("app.bgimg.");   // bakgrundsbilder är för stora för att synkas
 }
 function localSyncState() {
   const st = {};
