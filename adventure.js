@@ -613,11 +613,30 @@ function runAdvLesson(node, unit) {
     return b;
   }
 
+  // Vad du svarade, oavsett typ av övning (val, skrivruta, ordbank eller mikrofon)
+  function advGiven() {
+    const sel = body.querySelector(".adv-opt.sel");
+    if (sel) return sel.lastElementChild?.textContent || sel.textContent;
+    const inp = body.querySelector("input[type=text], textarea");
+    if (inp) return inp.value.trim();
+    const line = body.querySelector(".adv-bank-line");
+    if (line) return [...line.children].map(x => x.textContent.trim()).filter(Boolean).join(" ");
+    const heard = body.querySelector(".adv-speak-status, .adv-mic-status");
+    return heard ? heard.textContent.replace(/^Jag hörde\s*/, "").replace(/["”]/g, "") : "";
+  }
+
   // ---------- Rätta ----------
   function doCheck(giveUp = false) {
     if (checked || !ex) return;
     checked = true; dk.hide();
+    const given = giveUp ? null : advGiven();
     const r = giveUp ? { ...ex.evaluate(), ok: false, almost: false } : ex.evaluate(), w = cur.w;
+    // Spara frågan i historiken, så att man kan svepa/bläddra tillbaka till den
+    if (!ex.match) {
+      const qText = body.querySelector(".adv-prompt-text")?.textContent || (w ? (lang ? w.es : w.sv) : "");
+      const correct = r.correct || (w ? (lang ? `${w.es} = ${w.sv}` : `${w.sv}: ${w.es}`) : "");
+      sess.log({ q: qText, label: body.querySelector(".adv-q-title")?.textContent || "Äventyr", given, correct, ok: r.ok });
+    }
     let res = null;
     if (!ex.match) res = sess.answer(w, r.ok, ex.el, "adv", !!cur.retry);
     if (res) { xpEarned += res.gained; coinsWon += res.coins || 0; }

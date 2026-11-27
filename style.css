@@ -1666,7 +1666,7 @@ button.adv-label:not(.can-repeat) { opacity: .85; }
 .hist-btn:disabled { opacity: .35; cursor: default; filter: grayscale(.6); }
 .hist-arrow { font-size: 1.3rem; line-height: 1; }
 .hist-mid { flex: 1; text-align: center; font-size: .78rem; font-weight: 700; color: var(--muted); }
-section.reviewing > :not(.practice-head):not(.pbar):not(.hist-nav):not(.rv-panel) { display: none !important; }
+section.reviewing > :not(.practice-head):not(.pbar):not(.adv-top):not(.hist-nav):not(.rv-panel) { display: none !important; }
 .rv-panel.hidden { display: none; }
 .rv-panel { display: flex; flex-direction: column; gap: 12px; align-items: stretch; touch-action: pan-y; }
 .rv-card { position: relative; padding: 18px; border-radius: 22px; background: var(--card); border: 3px solid var(--border); overflow: hidden;
@@ -1694,3 +1694,11 @@ section.reviewing > :not(.practice-head):not(.pbar):not(.hist-nav):not(.rv-panel
 html, body { overscroll-behavior-x: none; }   /* svep i sidled ska inte backa webbläsaren */
 .kd-btn .kd-btn-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .kd-btn > span.kd-btn-go.kd-btn-go { flex: none; display: grid; width: 40px; height: 40px; }
+/* Äventyr: historiken syns under toppraden */
+
+.adv-lesson-view .hist-nav { padding: 0 2px; }
+.adv-lesson-view .rv-panel { padding-bottom: 20px; }
+/* Öva-knappen i Mina kort: grönt som tonar till blått */
+.kd-btn.play.go-blue { background: linear-gradient(115deg, #2f9e44 0%, #12b886 40%, #1c7ed6 100%); box-shadow: 0 6px 0 #1864ab, 0 12px 22px rgba(28,126,214,.3); }
+.mycards .practice-row { margin: 4px 0 4px; }
+.mycards #practiceInfo { margin: 6px 0 12px; }

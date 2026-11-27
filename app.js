@@ -1887,7 +1887,7 @@ function practiceHistory() {
   next.innerHTML = `<span>Nästa</span><span class="hist-arrow">›</span>`;
   nav.append(prev, mid, next);
   const panel = el("div", "rv-panel hidden");
-  const anchor = section.querySelector(".pbar") || section.querySelector(".practice-head");
+  const anchor = section.querySelector(".pbar") || section.querySelector(".adv-top") || section.querySelector(".practice-head");
   if (anchor) anchor.after(nav, panel); else section.prepend(nav, panel);
 
   function draw(dir = 0) {
