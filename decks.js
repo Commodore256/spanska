@@ -110,7 +110,7 @@ function klHsl(hex) {
 function klPaint(elem, color) {
   const [h, s, l] = klHsl(color);
   elem.style.setProperty("--k1", `hsl(${h} ${s}% ${l}%)`);
-  elem.style.setProperty("--k2", `hsl(${(h + 38) % 360} ${Math.min(95, s + 8)}% ${Math.min(62, l + 8)}%)`);
+  elem.style.setProperty("--k2", `hsl(${(h + 14) % 360} ${Math.min(95, s + 6)}% ${Math.min(64, l + 7)}%)`);
   elem.style.setProperty("--k3", `hsl(${h} ${s}% ${Math.max(18, l - 18)}%)`);
   elem.style.setProperty("--k4", `hsl(${h} ${s}% ${Math.min(96, l + 40)}%)`);
   return elem;
@@ -134,6 +134,7 @@ function klKindChip(kind) {
 function klTile(d, i = 0, small = false) {
   const st = klStats(d.id), subs = klChildren(d.id).length;
   const t = klPaint(el("button", "kl-tile" + (small ? " small" : "")), d.color);
+  t.append(el("span", "kl-tile-bg"));
   t.style.setProperty("--i", i);
   const top = el("div", "kl-tile-top");
   top.append(klIconEl(d.icon, "kl-tile-icon"), klRing(st.pct));
@@ -287,6 +288,7 @@ function showKlEdit(id, parentId) {
     preview.innerHTML = "";
     const k = KL_KINDS[draft.kind];
     const t = klPaint(el("div", "kl-tile preview"), draft.color);
+    t.append(el("span", "kl-tile-bg"));
     const top = el("div", "kl-tile-top");
     top.append(klIconEl(draft.icon, "kl-tile-icon"), klRing(0));
     t.append(top, el("b", "kl-tile-name", draft.name || (parent ? "Ny underkortlek" : "Ny kortlek")), klKindChip(draft.kind), el("small", "kl-tile-meta", k.desc));

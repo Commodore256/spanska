@@ -1543,3 +1543,9 @@ button.adv-label:not(.can-repeat) { opacity: .85; }
 .kl-tile:hover::before { transform: rotate(-5deg) translate(-7px, -8px); }
 .kl-tile:hover::after { transform: rotate(4.5deg) translate(8px, -6px); }
 @media (max-width: 520px) { .kl-grid.subs { grid-template-columns: 1fr 1fr; } }
+/* Lekens egen färg ligger i ett eget lager, så att korten i högen bakom aldrig täcker den */
+.kl-tile:not(.kl-new) { background: transparent; }
+.kl-tile::before, .kl-tile::after { z-index: -2; }
+.kl-tile-bg { position: absolute; inset: 0; border-radius: inherit; z-index: -1; background: linear-gradient(145deg, var(--k1), var(--k2)); pointer-events: none; }
+.kl-tile::before { background: var(--k4); opacity: .85; }
+.kl-tile::after { background: var(--k1); opacity: .55; filter: brightness(1.15); }
