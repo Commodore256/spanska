@@ -45,6 +45,32 @@ if (!configs.some(c => c.id === activeId)) activeId = configs[0].id;
 
 function cfg() { return configs.find(c => c.id === activeId) || configs[0]; }
 function isLanguage(c = cfg()) { return c.type !== "subject"; }
+
+// ---------- Kommentarer på rätt språk ----------
+// Språk-konfiger får kommentarer på sitt eget språk (blandat med svenska). Ämnen får bara svenska.
+const PHRASES = {
+  sv: { praise: ["Snyggt!", "Utmärkt!", "Perfekt!", "Grymt!", "Helt rätt!", "Bra jobbat!"], cheer: ["Kör hårt!", "Du klarar det!", "Heja!", "Nu kör vi!"],
+        hi: "Hej!", morning: "God morgon!", night: "God kväll!", wow: "Otroligt!", good: "Bra jobbat!", keep: "Fortsätt så!", nice: "Vad bra!", go: "Nu kör vi!" },
+  es: { praise: ["¡Muy bien!", "¡Excelente!", "¡Genial!", "¡Perfecto!"], cheer: ["¡Vamos!", "¡Ánimo!", "¡Olé!"],
+        hi: "¡Hola!", morning: "¡Buenos días!", night: "¡Buenas noches!", wow: "¡Increíble!", good: "¡Bien hecho!", keep: "¡Sigue así!", nice: "¡Qué bien!", go: "¡Vamos!" },
+  en: { praise: ["Well done!", "Excellent!", "Great!", "Perfect!"], cheer: ["Let's go!", "Keep it up!", "You got this!"],
+        hi: "Hello!", morning: "Good morning!", night: "Good evening!", wow: "Amazing!", good: "Well done!", keep: "Keep going!", nice: "Nice!", go: "Let's go!" },
+  de: { praise: ["Sehr gut!", "Ausgezeichnet!", "Super!", "Perfekt!"], cheer: ["Los geht's!", "Weiter so!", "Du schaffst das!"],
+        hi: "Hallo!", morning: "Guten Morgen!", night: "Guten Abend!", wow: "Unglaublich!", good: "Gut gemacht!", keep: "Weiter so!", nice: "Toll!", go: "Los geht's!" },
+  fr: { praise: ["Très bien !", "Excellent !", "Génial !", "Parfait !"], cheer: ["Allez !", "Courage !", "Tu peux le faire !"],
+        hi: "Salut !", morning: "Bonjour !", night: "Bonsoir !", wow: "Incroyable !", good: "Bien joué !", keep: "Continue comme ça !", nice: "Super !", go: "Allez !" },
+  it: { praise: ["Molto bene!", "Eccellente!", "Fantastico!", "Perfetto!"], cheer: ["Andiamo!", "Forza!", "Coraggio!"],
+        hi: "Ciao!", morning: "Buongiorno!", night: "Buonasera!", wow: "Incredibile!", good: "Ben fatto!", keep: "Continua così!", nice: "Che bello!", go: "Andiamo!" },
+  pt: { praise: ["Muito bem!", "Excelente!", "Ótimo!", "Perfeito!"], cheer: ["Vamos!", "Força!", "Você consegue!"],
+        hi: "Olá!", morning: "Bom dia!", night: "Boa noite!", wow: "Incrível!", good: "Bem feito!", keep: "Continue assim!", nice: "Que bom!", go: "Vamos!" }
+};
+function phraseLang(c = cfg()) { return isLanguage(c) && PHRASES[c.lang] ? c.lang : "sv"; }
+// En lista (praise, cheer) eller en fras (hi, good …) för den aktiva konfigen
+function phr(key) {
+  const p = PHRASES[phraseLang()], sv = PHRASES.sv;
+  return Array.isArray(p[key]) ? (p === sv ? sv[key] : [...p[key], ...sv[key]]) : (p[key] || sv[key]);
+}
+function phrPick(key) { const a = phr(key); return Array.isArray(a) ? a[Math.floor(Math.random() * a.length)] : a; }
 function langInfo(c = cfg()) { return LANGS[c.lang] || LANGS.es; }
 function sideLabels(c = cfg()) {
   return isLanguage(c) ? { sv: "Svenska", es: langInfo(c).native } : { sv: c.front || "Begrepp", es: c.back || "Förklaring" };
@@ -628,12 +654,46 @@ function normalize(s, lang) {
 function stripAccents(s) { return s.normalize("NFD").replace(/[̀-ͯ]/g, ""); }
 // "ok", "almost" (bara accent fel) eller "no"
 function check(input, correct, lang) {
+  if (!isLanguage()) return checkLenient(input, correct);
   const alts = correct.split(lang === "sv" ? /[\/,]/ : /\//).map(a => normalize(a, lang)).concat(normalize(correct, lang)).filter(Boolean);
   const given = normalize(input, lang);
   if (!given) return "no";
   if (alts.includes(given)) return "ok";
   if (alts.map(stripAccents).includes(stripAccents(given))) return "almost";
   return "no";
+}
+
+// Ämnen (inte språk): små stavfel är okej, men årtal måste vara exakt rätt.
+// "ok" = exakt, "almost" = rätt med små stavfel, "no" = fel
+function checkLenient(input, correct) {
+  const norm = s => stripAccents(String(s || "").toLowerCase()).replace(/[¿¡?!.,;:…"'()«»\-–—]/g, " ").replace(/\s+/g, " ").trim();
+  const given = norm(input);
+  if (!given) return "no";
+  const YEAR = /\b\d{3,4}\b/g;
+  const years = s => (s.match(YEAR) || []).sort().join(",");
+  const alts = [correct, ...String(correct).split(/\s*[\/;]\s*/)].map(norm).filter(Boolean);
+  for (const a of alts) {
+    if (a === given) return "ok";
+    if (years(a) !== years(given)) continue;            // fel eller saknat årtal = fel
+    const A = a.replace(YEAR, "#"), G = given.replace(YEAR, "#");
+    const allowed = A.length <= 4 ? 0 : A.length <= 8 ? 1 : A.length <= 14 ? 2 : Math.min(8, Math.round(A.length * 0.18));
+    if (lev(A, G) <= allowed) return "almost";
+  }
+  return "no";
+}
+// Texten när svaret räknas som rätt men inte var exakt
+function almostText(correct) {
+  return isLanguage() ? `Nästan! Tänk på accenterna: ${correct}` : `Rätt! Små stavfel räknas inte – rätt stavning: ${correct}`;
+}
+// Stor "Jag vet inte"-knapp under förloppsmätaren (långt från skrivfältet, så att man inte råkar trycka på den)
+function addDontKnow(onClick) {
+  const b = el("button", "btn dontknow", "🤷 Jag vet inte");
+  b.type = "button";
+  b.title = "Visa svaret – kortet räknas inte som klart";
+  b.onclick = () => { if (!b.classList.contains("hidden")) onClick(); };
+  const after = view.querySelector(".pbar");
+  if (after) after.after(b); else view.querySelector("section")?.prepend(b);
+  return { show: () => b.classList.remove("hidden"), hide: () => b.classList.add("hidden"), el: b };
 }
 
 // =====================================================================
@@ -1692,7 +1752,7 @@ function showDone(deck, text, again, right = 0, total = 0, { countPerfect = true
   const big = view.querySelector(".big");
   const share = total ? right / total : 0;
   big.textContent = share >= 0.8 ? "🎉" : share >= 0.5 ? "💪" : "🌱";
-  view.querySelector("h2").textContent = share >= 0.8 ? "¡Muy bien!" : share >= 0.5 ? "¡Bien hecho!" : "¡Sigue así!";
+  view.querySelector("h2").textContent = share >= 0.8 ? PHRASES[phraseLang()].praise[0] : share >= 0.5 ? phr("good") : phr("keep");
   playClass(big, "bounce-in");
   if (share >= 0.5) setTimeout(() => burst(big, ["🎉", "⭐", "✨", "🎊", "💫"], 18), 250);
   $("#btnAgain").onclick = again;
@@ -1813,10 +1873,11 @@ function runWrite(deck) {
   const input = $("#answer"), feedback = $("#feedback"), btnNext = $("#btnNext");
   const promptCard = view.querySelector(".card.static");
   const refreshTools = practiceTools(() => cur, id => { dropFromQueue(queue, id); next(); });
+  const dk = addDontKnow(() => { if (answered) return; input.value = ""; $("#writeForm").requestSubmit(); });
 
   function next() {
     if (!queue.length) return showDone(deck, `Du hade ${right} av ${total} rätt på första försöket.`, () => runWrite(deck), right, total);
-    cur = queue.shift(); answered = false;
+    cur = queue.shift(); answered = false; dk.show();
     refreshTools();
     const { item, showSv } = cur;
     const L = sideLabels();
@@ -1837,7 +1898,7 @@ function runWrite(deck) {
   $("#writeForm").onsubmit = e => {
     e.preventDefault();
     if (answered) return next();
-    answered = true;
+    answered = true; dk.hide();
     const { item, showSv } = cur;
     const correct = showSv ? item.es : item.sv;
     const result = check(input.value, correct, showSv ? "es" : "sv");
@@ -1846,7 +1907,7 @@ function runWrite(deck) {
       if (!cur.retry) right++;
       sess.answer(item, true, promptCard, "write", cur.retry);
       feedback.className = "feedback " + (result === "ok" ? "ok" : "almost");
-      feedback.textContent = result === "ok" ? `✓ Rätt! ${correct}` : `Nästan! Tänk på accenterna: ${correct}`;
+      feedback.textContent = result === "ok" ? `✓ Rätt! ${correct}` : almostText(correct);
       done++;
       playClass(promptCard, "pop");
       burst(promptCard, result === "ok" ? ["✨", "⭐", "🎉", "💫"] : ["⭐", "✨"], result === "ok" ? 12 : 6);
@@ -1872,6 +1933,7 @@ function runWrite(deck) {
 // =====================================================================
 const MODES = [
   { id: "cards", icon: "🃏", name: "Flashcards", desc: "Vänd korten och säg om du kunde", run: d => runCards(d) },
+  { id: "hard", icon: "💪", name: "Svårt läge", desc: "Bara flashcards och skrivfrågor – ingen uteslutningsmetod. AI:n rättar långa svar", run: d => runHard(d) },
   { id: "mc", icon: "🔘", name: "Flerval", desc: "Välj rätt bland fyra – felsvaren är luriga", run: d => runMC(d), min: 2 },
   { id: "write", icon: "⌨️", name: "Skrivförhör", desc: "Skriv översättningen", run: d => runWrite(d), lang: true },
   { id: "memory", icon: "🧠", name: "Memory", desc: "Vänd två kort i taget och hitta paren", run: d => runMemory(d), min: 3 },
@@ -1908,6 +1970,154 @@ function showPracticeMenu(deck) {
     b.onclick = () => m.run(sub);
     grid.append(b);
   });
+}
+
+// =====================================================================
+//  Svårt läge: flashcards och skrivfrågor blandat. Långa svar rättas av AI:n.
+// =====================================================================
+// Ett långt svar (förklaring, mening) går inte att rätta bokstav för bokstav
+function isLongAnswer(text) { return wordCount(text) > (isLanguage() ? 4 : 3) || String(text).length > 40; }
+async function aiGrade(question, correct, answer, c = cfg()) {
+  const ai = aiConfig();
+  return fetchJson(ai.url.replace(/\/+$/, ""), {
+    method: "POST", headers: aiHeaders(ai),
+    body: JSON.stringify({ mode: "grade", question, correct, answer, cfg: aiCfgPayload(c) })
+  }, 30000);
+}
+function runHard(deck) {
+  titleEl.textContent = "Svårt läge";
+  render("tpl-hard", "hard");
+  goBack = deck.back; reopen = deck.back;
+  setupAccents(view);
+  const queue = buildSession(deck).map(q => ({ ...q, kind: Math.random() < 0.5 ? "flash" : "write" })), total = queue.length;
+  let right = 0, cur = null, answered = false, done = 0;
+  const sess = practiceSession(), L = sideLabels();
+  const promptCard = view.querySelector(".hard-card"), input = $("#hardInput"), form = $("#hardForm");
+  const feedback = $("#feedback"), btnNext = $("#btnNext"), flash = $("#hardFlash");
+  const refreshTools = practiceTools(() => cur, id => { dropFromQueue(queue, id); next(); });
+  const dk = addDontKnow(() => giveUp());
+  $("#btnSpeakQ").onclick = () => speak(cur.item.es);
+
+  const q = () => cur.showSv ? cur.item.sv : cur.item.es;          // det du ser
+  const facit = () => cur.showSv ? cur.item.es : cur.item.sv;      // det du ska kunna
+  const answerLabel = () => cur.showSv ? L.es : L.sv;
+
+  function next() {
+    if (!queue.length) return showDone(deck, `Svårt läge: ${right} av ${total} rätt på första försöket.`, () => runHard(deck), right, total);
+    cur = queue.shift(); answered = false;
+    refreshTools(); dk.show();
+    $("#progress").textContent = `${total - queue.length} / ${total}`;
+    setPbar(done, total);
+    $("#promptLang").textContent = (cur.showSv ? L.sv : L.es) + " → " + answerLabel();
+    $("#hardKind").textContent = cur.kind === "flash" ? "🃏 Flashcard" : isLongAnswer(facit()) ? "✍️ Skriv – AI:n rättar" : "⌨️ Skriv";
+    $("#prompt").textContent = q();
+    $("#prompt").classList.toggle("long", q().length > 60);
+    $("#btnSpeakQ").classList.toggle("hidden", !isLanguage() || cur.showSv);
+    feedback.className = "feedback hidden"; feedback.innerHTML = "";
+    btnNext.classList.add("hidden"); $("#judgeRow").classList.add("hidden");
+    playClass(promptCard, "deal-in");
+    const isFlash = cur.kind === "flash";
+    flash.classList.toggle("hidden", !isFlash); form.classList.toggle("hidden", isFlash);
+    if (isFlash) {
+      $("#btnReveal").classList.remove("hidden");
+      $("#hardAnswer").classList.add("hidden"); $("#selfRow").classList.add("hidden");
+      $("#btnReveal").focus();
+    } else {
+      const long = isLongAnswer(facit());
+      input.value = ""; input.disabled = false; $("#btnGrade").disabled = false;
+      input.rows = long ? 4 : 1;
+      input.classList.toggle("long", long);
+      input.lang = cur.showSv && isLanguage() ? cfg().lang : "sv";
+      input.placeholder = long ? `Skriv ${answerLabel().toLowerCase()} med egna ord…` : `Skriv ${isLanguage() ? "på " + answerLabel().toLowerCase() : answerLabel().toLowerCase()}…`;
+      input.focus();
+    }
+    if (!cur.showSv && isLanguage()) speak(cur.item.es);
+  }
+
+  // Resultat av ett kort (gemensamt för alla vägar)
+  function finish(ok, mode, fromEl) {
+    answered = true; dk.hide();
+    if (ok) { if (!cur.retry) right++; done++; playClass(promptCard, "pop"); burst(promptCard, ["✨", "⭐", "💪", "💫"], 10); }
+    else { queue.splice(Math.min(3, queue.length), 0, { ...cur, retry: true }); playClass(promptCard, "shake"); }
+    sess.answer(cur.item, ok, fromEl || promptCard, mode, cur.retry);
+    setPbar(done, total);
+    if (isLanguage()) speak(cur.item.es);
+    btnNext.classList.remove("hidden"); btnNext.focus();
+  }
+  function showFacit(cls, title, extra) {
+    feedback.className = "feedback " + cls; feedback.innerHTML = "";
+    feedback.append(el("b", "", title));
+    if (extra) feedback.append(el("div", "hard-ai", extra));
+    const f = el("div", "hard-facit"); f.append(el("small", "", answerLabel() + ":"), el("span", "", facit()));
+    feedback.append(f);
+    playClass(feedback, "pop-in");
+  }
+
+  // Flashcard
+  $("#btnReveal").onclick = () => {
+    $("#btnReveal").classList.add("hidden");
+    $("#answerLang").textContent = answerLabel();
+    $("#answerText").textContent = facit();
+    $("#hardAnswer").classList.remove("hidden"); $("#selfRow").classList.remove("hidden");
+    playClass($("#hardAnswer"), "pop-in");
+    dk.hide();
+    if (cur.showSv && isLanguage()) speak(cur.item.es);
+    $("#btnSelfYes").focus();
+  };
+  const self = ok => { if (answered) return; $("#selfRow").classList.add("hidden"); finish(ok, "cards", ok ? $("#btnSelfYes") : null); };
+  $("#btnSelfYes").onclick = () => self(true);
+  $("#btnSelfNo").onclick = () => self(false);
+
+  // Jag vet inte
+  function giveUp() {
+    if (answered) return;
+    input.disabled = true;
+    if (cur.kind === "flash") { $("#btnReveal").classList.add("hidden"); $("#selfRow").classList.add("hidden"); }
+    showFacit("no", "Inga problem – här är svaret. Kortet kommer tillbaka snart.");
+    finish(false, cur.kind === "flash" ? "cards" : "write");
+  }
+
+  // Skrivfråga
+  input.onkeydown = e => {
+    if (e.key === "Enter" && !e.shiftKey && (!input.classList.contains("long") || e.ctrlKey || e.metaKey)) { e.preventDefault(); form.requestSubmit(); }
+  };
+  form.onsubmit = async e => {
+    e.preventDefault();
+    if (answered) return next();
+    const given = input.value.trim(), correct = facit();
+    if (!given) { toast("Skriv ett svar – eller tryck på ”Jag vet inte”"); input.focus(); return; }
+    input.disabled = true; $("#btnGrade").disabled = true; dk.hide();
+    if (!isLongAnswer(correct)) {
+      const r = check(given, correct, cur.showSv ? "es" : "sv");
+      if (r === "ok") showFacit("ok", "✓ " + phrPick("praise"));
+      else if (r === "almost") showFacit("almost", "✓ " + almostText(correct).split(":")[0]);
+      else showFacit("no", "✗ Inte riktigt");
+      return finish(r !== "no", "write");
+    }
+    // Långt svar: AI:n rättar, annars bedömer du själv
+    if (aiEnabled() && navigator.onLine) {
+      feedback.className = "feedback pending"; feedback.textContent = "🤖 AI:n rättar ditt svar…";
+      const id = cur;
+      try {
+        const g = await aiGrade(q(), correct, given);
+        if (cur !== id || !alive(feedback)) return;
+        showFacit(g.ok ? "ok" : "no", g.ok ? `✓ ${phrPick("praise")} (${g.score} %)` : `✗ Inte riktigt (${g.score} %)`, g.feedback ? "🤖 " + g.feedback : "");
+        return finish(!!g.ok, "write");
+      } catch (err) {
+        if (cur !== id || !alive(feedback)) return;
+        showFacit("almost", "AI:n kunde inte rätta just nu – jämför själv med facit:", String(err.message || err));
+      }
+    } else {
+      showFacit("almost", "Jämför ditt svar med facit:", aiEnabled() ? "Du är offline, så AI:n kan inte rätta." : "Koppla AI:n för att få långa svar rättade automatiskt.");
+    }
+    $("#judgeRow").classList.remove("hidden");
+    $("#btnJudgeYes").focus();
+  };
+  const judge = ok => { if (answered) return; $("#judgeRow").classList.add("hidden"); finish(ok, "write"); };
+  $("#btnJudgeYes").onclick = () => judge(true);
+  $("#btnJudgeNo").onclick = () => judge(false);
+  btnNext.onclick = next;
+  next();
 }
 
 // =====================================================================
@@ -1991,9 +2201,18 @@ function runMC(deck) {
   $("#btnSpeakQ").classList.toggle("hidden", !isLanguage());
   $("#btnSpeakQ").onclick = () => speak(cur.item.es);
 
+  const dkM = addDontKnow(() => {
+    if (answered) return;
+    answered = true; dkM.hide();
+    opts.querySelectorAll(".mc-opt").forEach(b => { b.disabled = true; if (b.dataset.correct) b.classList.add("right"); });
+    sess.answer(cur.item, false, promptCard, "mc", cur.retry);
+    queue.splice(Math.min(3, queue.length), 0, { ...cur, retry: true });
+    speak(cur.item.es);
+    btnNext.classList.remove("hidden"); btnNext.focus();
+  });
   function next() {
     if (!queue.length) return showDone(deck, `Du hade ${right} av ${total} rätt på första försöket.`, () => runMC(deck), right, total);
-    cur = queue.shift(); answered = false;
+    cur = queue.shift(); answered = false; dkM.show();
     refreshTools();
     const { item, showSv } = cur, L = sideLabels();
     const answerSide = showSv ? "es" : "sv", correct = item[answerSide];
@@ -2019,7 +2238,7 @@ function runMC(deck) {
   }
   async function choose(btn, ok) {
     if (answered) return;
-    answered = true;
+    answered = true; dkM.hide();
     opts.querySelectorAll(".mc-opt").forEach(b => { b.disabled = true; if (b.dataset.correct) b.classList.add("right"); });
     if (ok) {
       if (!cur.retry) right++;
@@ -2126,9 +2345,10 @@ function runListen(deck) {
   $("#btnSlow").onclick = () => play(0.5);
   $("#btnHint").onclick = () => { $("#hint").textContent = `Betyder: ${cur.item.sv}`; $("#hint").classList.remove("hidden"); };
 
+  const dkL = addDontKnow(() => { if (answered) return; input.value = ""; $("#writeForm").requestSubmit(); });
   function next() {
     if (!queue.length) return showDone(deck, `Du hade ${right} av ${total} rätt på första försöket.`, () => runListen(deck), right, total);
-    cur = queue.shift(); answered = false;
+    cur = queue.shift(); answered = false; dkL.show();
     refreshTools();
     $("#progress").textContent = `${total - queue.length} / ${total}`;
     setPbar(done, total);
@@ -2143,7 +2363,7 @@ function runListen(deck) {
   $("#writeForm").onsubmit = e => {
     e.preventDefault();
     if (answered) return next();
-    answered = true;
+    answered = true; dkL.hide();
     const result = check(input.value, cur.item.es, "es");
     input.disabled = true;
     if (result !== "no") {

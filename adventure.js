@@ -12,8 +12,7 @@ const ADV_COLORS = [
 ];
 const ADV_OFFSETS = [0, 46, 70, 46, 0, -46, -70, -46];
 const ADV_MASCOTS = ["🦎", "🐂", "🌵", "🦜", "🐙", "🦊"];
-const ADV_PRAISE = ["Snyggt!", "Utmärkt!", "Perfekt!", "¡Muy bien!", "Grymt!", "Helt rätt!", "¡Excelente!", "Bra jobbat!", "¡Genial!"];
-const ADV_CHEER = ["¡Vamos!", "¡Hola!", "¡Ánimo!", "Du klarar det!", "¡Olé!", "Kör hårt!"];
+// Beröm och hejarop kommer från phr() i app.js – på konfigens språk, eller svenska för ämnen
 const ADV_UNIT_DESC = {
   "Grundord": "Vardagsfraser, mat, pengar och vanliga verb",
   "Spanska steg 3": "Arbete, resor, samhälle, åsikter, preteritum och studier"
@@ -201,7 +200,8 @@ function showAdventure(opts = {}) {
         const fig = typeof mascotEl === "function"
           ? mascotEl(["wave", "happy", "love", "proud", "celebrate", "idle"][u.idx % 6], "path-fig")
           : el("span", "adv-mascot-fig", u.mascot);
-        m.append(el("span", "adv-mascot-say", ADV_CHEER[(u.idx + 2) % ADV_CHEER.length]), fig);
+        const cheers = phr("cheer");
+        m.append(el("span", "adv-mascot-say", cheers[(u.idx + 2) % cheers.length]), fig);
         wrap.append(m);
         mascotPlaced = true;
       }
@@ -355,6 +355,12 @@ function runAdvLesson(node, unit) {
   const t0 = Date.now();
   const body = $("#advBody"), checkBtn = $("#advCheck"), sheet = $("#advSheet"), bar = $("#advBar");
   let ex = null;   // aktuell övning: { ready, evaluate(), el }
+  // "Jag vet inte": visar svaret och räknas som fel. Ligger uppe under förloppet, långt från skrivfältet.
+  const dk = el("button", "btn dontknow adv-dontknow hidden", "🤷 Jag vet inte");
+  dk.type = "button"; dk.title = "Visa svaret – räknas inte som rätt";
+  dk.show = () => dk.classList.remove("hidden"); dk.hide = () => dk.classList.add("hidden");
+  dk.onclick = () => { if (!checked) doCheck(true); };
+  $(".adv-top").after(dk);
 
   $("#advQuit").onclick = quit;
   const hb = $("#advHearts");
@@ -608,20 +614,20 @@ function runAdvLesson(node, unit) {
   }
 
   // ---------- Rätta ----------
-  function doCheck() {
+  function doCheck(giveUp = false) {
     if (checked || !ex) return;
-    checked = true;
-    const r = ex.evaluate(), w = cur.w;
+    checked = true; dk.hide();
+    const r = giveUp ? { ...ex.evaluate(), ok: false, almost: false } : ex.evaluate(), w = cur.w;
     let res = null;
     if (!ex.match) res = sess.answer(w, r.ok, ex.el, "adv", !!cur.retry);
     if (res) { xpEarned += res.gained; coinsWon += res.coins || 0; }
     sheet.className = "adv-sheet show " + (r.ok ? "ok" : "bad");
     sheet.innerHTML = "";
     const head = el("div", "adv-sheet-head");
-    head.append(el("span", "adv-sheet-icon", r.ok ? "✓" : "✗"), el("b", "", r.ok ? ADV_PRAISE[Math.floor(Math.random() * ADV_PRAISE.length)] : "Inte riktigt"));
+    head.append(el("span", "adv-sheet-icon", r.ok ? "✓" : "✗"), el("b", "", r.ok ? phrPick("praise") : (giveUp ? "Här är svaret" : "Inte riktigt")));
     if (typeof mascotMini === "function") head.append(mascotMini(r.ok ? (r.almost ? "happy" : mPick(["happy", "love", "celebrate"])) : mPick(["sad", "shock"])));
     sheet.append(head);
-    if (r.ok && r.almost) sheet.append(el("div", "adv-sheet-text", `Tänk på accenterna: ${r.correct}`));
+    if (r.ok && r.almost) sheet.append(el("div", "adv-sheet-text", almostText(r.correct)));
     if (!r.ok && r.correct) {
       sheet.append(el("div", "adv-sheet-label", "Rätt svar:"), el("div", "adv-sheet-text", r.correct));
       if (w) sheet.append(el("div", "adv-sheet-sub", lang ? `${w.es} = ${w.sv}` : `${w.sv}: ${w.es}`));
@@ -654,6 +660,8 @@ function runAdvLesson(node, unit) {
     cur = queue.shift();
     if (cur.first === undefined) cur.first = true;
     show();
+    // "Jag vet inte" finns inte på para-ihop-övningarna (där kan man inte gissa sig igenom)
+    if (ex && !ex.match) dk.show(); else dk.hide();
   }
   checkBtn.onclick = () => { if (checked) next(); else doCheck(); };
   document.onkeydown = e => {

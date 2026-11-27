@@ -277,6 +277,44 @@
     </section>
   </template>
 
+  <!-- Svårt läge: bara flashcards och skrivfrågor -->
+  <template id="tpl-hard">
+    <section class="hard">
+      <div class="practice-head"><p id="progress" class="muted"></p><span id="combo" class="combo hidden"></span>
+      <div class="practice-tools">
+        <button id="btnMark" class="tool" title="Gulmarkera kortet">🟡 <span>Gulmarkera</span></button>
+        <button id="btnTrash" class="tool" title="Ta bort kortet">🗑 <span>Ta bort</span></button>
+      </div>
+      </div>
+      <div class="pbar"><i id="pbarFill"></i></div>
+      <div class="card static hard-card">
+        <small id="promptLang" class="lang-tag"></small>
+        <span id="hardKind" class="hard-kind"></span>
+        <button id="btnSpeakQ" class="sc-speak" title="Lyssna">🔊</button>
+        <div id="prompt" class="card-text"></div>
+      </div>
+      <div id="hardFlash" class="hard-flash hidden">
+        <button id="btnReveal" class="btn good hard-reveal">👀 Visa svaret</button>
+        <div id="hardAnswer" class="card static hard-answer hidden"><small id="answerLang" class="lang-tag"></small><div id="answerText" class="card-text"></div></div>
+        <div id="selfRow" class="row hidden">
+          <button id="btnSelfNo" class="btn bad">✗ Kunde inte</button>
+          <button id="btnSelfYes" class="btn good">✓ Kunde</button>
+        </div>
+      </div>
+      <form id="hardForm" class="write-form hard-form hidden" autocomplete="off">
+        <textarea id="hardInput" rows="1" autocapitalize="off" spellcheck="false"></textarea>
+        <div class="accents" data-target="hardInput"></div>
+        <button id="btnGrade" class="btn good" type="submit">Rätta</button>
+      </form>
+      <div id="feedback" class="feedback hidden"></div>
+      <div id="judgeRow" class="row hidden">
+        <button id="btnJudgeNo" class="btn bad">✗ Jag hade fel</button>
+        <button id="btnJudgeYes" class="btn good">✓ Jag hade rätt</button>
+      </div>
+      <div class="row"><button id="btnNext" class="btn secondary hidden">Nästa →</button></div>
+    </section>
+  </template>
+
   <template id="tpl-list">
     <section class="list">
       <ul id="wordList" class="word-list"></ul>

@@ -217,7 +217,7 @@ function mReconcile() {
   if (typeof r.lvl !== "number") r.lvl = lvl;
   while (r.lvl < lvl) {
     r.lvl++; coins += COIN_LEVEL;
-    mascotEvent({ mood: "celebrate", title: `⭐ Nivå ${r.lvl}!`, text: mPick(["Du blir bättre för varje dag! ¡Increíble!", "Ny nivå! Jag är så stolt över dig 🥹", "¡Olé! Vi klättrar uppåt!"]), coins: COIN_LEVEL, big: true });
+    mascotEvent({ mood: "celebrate", title: `⭐ Nivå ${r.lvl}!`, text: mPick([`Du blir bättre för varje dag! ${phr("wow")}`, "Ny nivå! Jag är så stolt över dig 🥹", `${phrPick("cheer")} Vi klättrar uppåt!`]), coins: COIN_LEVEL, big: true });
   }
   const un = unlockedAch();
   for (const a of ACHIEVEMENTS) {
@@ -249,12 +249,12 @@ function mascotAward({ ok, mult = 1, mastered, goalReached, firstToday }) {
     const s = currentStreak(), b = 5 + Math.min(s, 10);
     c += b;
     mascotEvent(s >= 2
-      ? { mood: "proud", title: `🔥 ${s} dagar i rad!`, text: mPick(["Streaken lever! Fortsätt så här!", "Du är ostoppbar! Vi ses imorgon också 😼", "¡Fuego! Det här är vanan som gör dig grym på spanska."]), coins: b, big: true }
+      ? { mood: "proud", title: `🔥 ${s} dagar i rad!`, text: mPick(["Streaken lever! Fortsätt så här!", "Du är ostoppbar! Vi ses imorgon också 😼", `🔥 Det här är vanan som gör dig grym på ${cfg().name.toLowerCase()}.`]), coins: b, big: true }
       : { mood: "happy", title: "🔥 Dagens första svar!", text: "Streaken är igång. Kom tillbaka imorgon så växer den!", coins: b });
   }
   if (goalReached) {
     c += COIN_GOAL;
-    mascotEvent({ mood: "celebrate", title: "🎯 Dagsmålet nått!", text: `${getGoal()} kort idag. ¡Qué bien!`, coins: COIN_GOAL, big: true });
+    mascotEvent({ mood: "celebrate", title: "🎯 Dagsmålet nått!", text: `${getGoal()} kort idag. ${phr("nice")}`, coins: COIN_GOAL, big: true });
   }
   earnCoins(c);
   return { coins: c + mReconcile() };
@@ -439,11 +439,16 @@ function homeMood() {
   const name = mascotName();
   if (h >= 23 || h < 5) return ["sleepy", today ? "Zzz… bra jobbat idag. Dags att sova? 😴" : "Zzz… det är sent. Ett par kort och sen sängen?"];
   if (!today && h >= 17 && st > 0) return ["sad", `Vi har inte övat idag än 🥺 Din streak på ${st} ${st === 1 ? "dag" : "dagar"} vill inte brinna ut!`];
-  if (!today) return ["wave", mPick([`¡Hola! Jag är ${name}. Ska vi köra en runda?`, "¡Buenos días! Redo för lite spanska?", "Hej igen! Dina kort längtar efter dig 📚"])];
-  if (today >= goal) return ["proud", mPick(["Dagsmålet är klart! 🎯 Du är grym.", "¡Perfecto! Allt du gör nu är bonus 😼"])];
+  if (!today) return ["wave", mPick([`${phr("hi")} Jag är ${name}. Ska vi köra en runda?`, `${phr("morning")} Redo för lite ${cfg().name.toLowerCase()}?`, "Hej igen! Dina kort längtar efter dig 📚"])];
+  if (today >= goal) return ["proud", mPick(["Dagsmålet är klart! 🎯 Du är grym.", `${phrPick("praise")} Allt du gör nu är bonus 😼`])];
   return ["happy", `${today}/${goal} kort idag – ${goal - today} kvar till dagsmålet!`];
 }
-const TAP_LINES = ["¡Hola!", "¡Vamos!", "¡Qué guay!", "Miau… menar jag, ¡olé!", "Pssst… butiken har nya grejer 👀", "¿Qué tal?", "Jag är ett iberiskt lodjur, världens coolaste katt 😼", "¡Ánimo!"];
+// Vad hon säger när du klappar henne – på konfigens språk, svenska för ämnen
+function tapLines() {
+  const base = ["Pssst… butiken har nya grejer 👀", "Jag är ett iberiskt lodjur, världens coolaste katt 😼", "Mjau! 🐾", phr("hi"), ...phr("cheer")];
+  if (phraseLang() === "es") base.push("¡Qué guay!", "¿Qué tal?", "Miau… menar jag, ¡olé!");
+  return base;
+}
 
 // Kortet överst på startsidan
 function renderHomeMascot() {
@@ -472,7 +477,7 @@ function renderHomeMascot() {
   figBtn.onclick = () => {
     const m = mPick(["happy", "love", "wave", "celebrate", "shock", "think"]);
     setMood(fig, m);
-    bubble.textContent = TAP_LINES[Math.floor(Math.random() * TAP_LINES.length)];
+    bubble.textContent = mPick(tapLines());
     playClass(bubble, "pop");
     if (m === "love") burst(figBtn, ["💖", "✨"], 8);
     clearTimeout(figBtn._t);
@@ -686,9 +691,9 @@ function mascotGreet(afterLogin = false) {
     mascotEvent({ mood: "sad", title: "Streaken brann ut 😢", text: `Ingen fara – vi startar en ny idag! Svara på ett kort så tänder vi elden igen.` });
     return;
   }
-  const h = new Date().getHours(), hi = h < 10 ? "¡Buenos días!" : h < 18 ? "¡Hola!" : "¡Buenas noches!";
+  const h = new Date().getHours(), hi = h < 10 ? phr("morning") : h < 18 ? phr("hi") : phr("night");
   mascotEvent({ mood: "wave", title: `${hi} 👋`, text: afterLogin
-    ? `Jag är ${name}, din spanska kompis. Kul att du är här – nu kör vi!`
+    ? `Jag är ${name}, din pluggkompis. Kul att du är här – nu kör vi!`
     : st ? `Du har ${st} ${st === 1 ? "dag" : "dagar"} i rad. Ska vi göra det ${st + 1}? 🔥` : `Jag har saknat dig! Ska vi plugga lite?` });
 }
 
@@ -696,9 +701,9 @@ function mascotGreet(afterLogin = false) {
 (function mascotInit() {
   const first = mascotFirstRun();
   if (first) {
-    mascotEvent({ mood: "wave", big: true, title: `¡Hola! Jag är ${MASCOT_DEFAULT_NAME} 🐾`,
-      text: "Ett litet iberiskt lodjur som pluggar spanska med dig. Du tjänar 🪙 mynt när du övar – köp kläder till mig i butiken och lås upp specialprylar med märken och utmaningar!",
-      coins: coinsEarned(), button: "¡Vamos!" });
+    mascotEvent({ mood: "wave", big: true, title: `${phr("hi")} Jag är ${MASCOT_DEFAULT_NAME} 🐾`,
+      text: "Ett litet iberiskt lodjur som pluggar med dig. Du tjänar 🪙 mynt när du övar – köp kläder till mig i butiken och lås upp specialprylar med märken och utmaningar!",
+      coins: coinsEarned(), button: phr("go") });
     mascotIntroShown = true;
     save("app.mGreet", todayKey());
   } else {
