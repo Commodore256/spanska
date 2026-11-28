@@ -89,7 +89,11 @@ function bgReadImage(file) {
 // ---------- Vyn: Bakgrund ----------
 function showBg() {
   titleEl.textContent = "Bakgrund";
-  goBack = showSettings; reopen = showBg;
+  // ⌂ går tillbaka till Inställningar, och därifrån till där du var innan (t.ex. startsidan) –
+  // inte i en loop mellan Bakgrund och Inställningar
+  const settingsBack = goBack && goBack !== showBg ? goBack : showHome;
+  goBack = () => { reopen = settingsBack; showSettings(); };
+  reopen = showBg;
   render("tpl-bg", "bg");
   const c = cfg();
   const prev = $("#bgPreview");
