@@ -409,6 +409,10 @@
   <!-- Bakgrund -->
   <template id="tpl-bg">
     <section class="bgv">
+      <div class="setting-row bg-original">
+        <span class="setting-text"><b>🏠 Original bakgrund</b><small class="muted">På: appens vanliga bakgrund. Av: din egen bakgrund nedan. Dina val sparas så att du kan byta fram och tillbaka.</small></span>
+        <label class="switch"><input id="bgOriginal" type="checkbox" role="switch" aria-label="Original bakgrund"><span class="slider"></span></label>
+      </div>
       <div id="bgPreview" class="bg-preview">
         <div class="bgp-fill"></div>
         <div class="bgp-bar"></div>
@@ -451,6 +455,10 @@
         <input id="bgFile" type="file" accept="image/png,image/jpeg,image/webp" hidden>
       </div>
 
+      <div id="bgClearRow" class="setting-row bg-frost hidden">
+        <span class="setting-text"><b>🪟 Genomskinlig topplist</b><small class="muted">Tar bort den färgade listen och strecket högst upp, så att bakgrunden syns över hela skärmen</small></span>
+        <label class="switch"><input id="bgClear" type="checkbox" role="switch" aria-label="Genomskinlig topplist"><span class="slider"></span></label>
+      </div>
       <div id="bgFrostRow" class="setting-row bg-frost hidden">
         <span class="setting-text"><b>❄️ Frostad effekt</b><small class="muted">Suddar ut och ljusar upp bakgrunden, som frostat glas – texten blir lättare att läsa</small></span>
         <label class="switch"><input id="bgFrost" type="checkbox" role="switch" aria-label="Frostad effekt"><span class="slider"></span></label>

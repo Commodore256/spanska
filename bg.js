@@ -17,7 +17,7 @@ const BG_STYLES = [
   { id: "radial", name: "Cirkel" }, { id: "spot", name: "Spotlight" }, { id: "blobs", name: "Bubblor" },
   { id: "conic", name: "Virvel" }, { id: "flow", name: "Rörlig" }
 ];
-const BG_DEFAULT = { type: "none", c1: "#845ef7", c2: "#22b8cf", style: "diag", frost: false, img: null };
+const BG_DEFAULT = { type: "none", c1: "#845ef7", c2: "#22b8cf", style: "diag", frost: false, img: null, clearTop: false, original: false };
 
 function bgCss(s) {
   const a = s.c1 || BG_DEFAULT.c1, b = s.c2 || BG_DEFAULT.c2;
@@ -57,8 +57,11 @@ function applyBg() {
     document.body.prepend(layer);
   }
   const s = bgSettings(), css = bgCss(s);
-  const on = s.type !== "none" && !!css;
+  // "Original bakgrund" på = visa appens vanliga bakgrund, men behåll dina val till nästa gång
+  const on = !s.original && s.type !== "none" && !!css;
   document.body.classList.toggle("has-bg", on);
+  // Genomskinlig topplist: bakgrunden syns över hela skärmen
+  document.querySelector(".topbar")?.classList.toggle("clear", on && !!s.clearTop);
   layer.classList.toggle("frost", on && !!s.frost);
   layer.classList.toggle("flow", on && s.type === "gradient" && s.style === "flow");
   layer.style.background = on ? css : "";
@@ -115,6 +118,12 @@ function showBg() {
     $("#bgImage").classList.toggle("hidden", s.type !== "image");
     $("#bgFrostRow").classList.toggle("hidden", s.type === "none");
     $("#bgFrost").checked = !!s.frost;
+    $("#bgClearRow").classList.toggle("hidden", s.type === "none");
+    $("#bgClear").checked = !!s.clearTop;
+    $("#bgOriginal").checked = !!s.original;
+    view.querySelector(".bgv").classList.toggle("is-original", !!s.original);
+    prev.classList.toggle("clear-top", !!s.clearTop && s.type !== "none");
+    prev.classList.toggle("original", !!s.original);
     // Färger
     view.querySelectorAll(".bg-sw[data-slot]").forEach(b => b.classList.toggle("on", b.dataset.c.toLowerCase() === (s[b.dataset.slot] || "").toLowerCase()));
     view.querySelectorAll("input[type=color][data-slot]").forEach(i => { i.value = s[i.dataset.slot] || "#000000"; });
@@ -192,6 +201,8 @@ function showBg() {
   };
   // Frost och omfattning
   $("#bgFrost").onchange = e => update({ frost: e.target.checked });
+  $("#bgClear").onchange = e => update({ clearTop: e.target.checked });
+  $("#bgOriginal").onchange = e => { update({ original: e.target.checked }); toast(e.target.checked ? "Original bakgrund – dina val sparas till nästa gång" : "🎨 Din bakgrund är på igen"); };
   $("#bgScope").onchange = e => {
     if (e.target.checked) save(lsKey("bg"), { ...bgSettings(), on: true });
     else save(lsKey("bg"), null);

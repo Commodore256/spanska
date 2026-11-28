@@ -1921,3 +1921,16 @@ body.has-bg .lead, body.has-bg .home > .muted, body.has-bg h2, body.has-bg h3 { 
 .bg-img-actions { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
 .bg-img-actions .kd-btn { width: 100%; }
 .bgv .row { margin: 18px 0 30px; }
+/* Genomskinlig topplist */
+.topbar.clear { background: transparent; border-bottom-color: transparent; color: var(--text); }
+.topbar.clear h1 #title, .topbar.clear .version { text-shadow: 0 1px 3px color-mix(in srgb, var(--card) 85%, transparent); }
+.topbar.clear .icon-btn { background: color-mix(in srgb, var(--card) 72%, transparent); color: var(--text); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 0 rgba(0,0,0,.12); }
+.topbar.clear .cfg-badge { color: var(--text); box-shadow: 0 2px 0 rgba(0,0,0,.15); }
+/* Förhandsvisningen */
+.bg-preview.clear-top .bgp-bar { background: transparent; box-shadow: none; }
+.bg-preview.clear-top .bgp-bar::after { content: ""; position: absolute; left: 10px; top: 5px; width: 16px; height: 16px; border-radius: 5px; background: rgba(255,255,255,.75); box-shadow: 250px 0 0 rgba(255,255,255,.75); }
+.bg-preview.original .bgp-fill { background: var(--bg) !important; filter: none !important; transform: none !important; }
+.bg-preview.original::after { display: none; }
+.bgv.is-original .bg-sect, .bgv.is-original #bgTypes, .bgv.is-original .bg-frost, .bgv.is-original .bg-scope { opacity: .45; }
+.bg-original { margin-bottom: 14px; border: 2px solid color-mix(in srgb, #845ef7 40%, transparent); }
