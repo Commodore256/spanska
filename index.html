@@ -96,7 +96,6 @@
       <div class="practice-row home-practice">
         <button id="btnHomePractice" class="kd-btn play btn-practice go-blue"><span class="kd-btn-icon" data-ic="play"></span><span class="kd-btn-text"><b>Öva</b><small id="homePracticeSub">Alla dina kort</small></span><span class="kd-btn-go" data-ic="arrow"></span></button>
       </div>
-      <button id="btnHomeNotes" class="kd-btn notes-btn home-notes" type="button"><span class="kd-btn-icon" data-ic="bookopen"></span><span class="kd-btn-text"><b>Notes</b><small id="homeNotesSub">Dina anteckningar för konfigen</small></span><span class="kd-btn-go" data-ic="arrow"></span></button>
       <button id="btnMyCards" class="deck-btn mine">
         <b>📒 Mina kort</b>
         <span id="myCardsInfo" class="muted"></span>
@@ -380,7 +379,6 @@
         <button id="kdPractice" class="kd-btn play"><span class="kd-btn-icon" data-ic="play"></span><span><b>Öva kortleken</b><small></small></span></button>
         <button id="kdImport" class="kd-btn import"><span class="kd-btn-icon" data-ic="download"></span><span><b>Importera kort från Mina kort</b><small>Välj kort med plusknappen</small></span></button>
         <button id="kdNewSub" class="kd-btn sub"><span class="kd-btn-icon" data-ic="plus"></span><span><b>Ny underkortlek</b><small>Med egen typ, färg och ikon</small></span></button>
-        <button id="kdNotes" class="kd-btn notes-btn"><span class="kd-btn-icon" data-ic="bookopen"></span><span class="kd-btn-text"><b>Notes</b><small>Anteckningar för just den här leken</small></span></button>
         <button id="kdEdit" class="kd-btn edit"><span class="kd-btn-icon" data-ic="pen"></span><span><b>Ändra leken</b><small>Namn, typ, färg – eller ta bort</small></span></button>
       </div>
       <h3 id="kdSubsHead" class="kd-h"><span class="kd-h-ic" data-ic="layers"></span>Underkortlekar</h3>
@@ -532,29 +530,6 @@
         <button id="calToday" class="cal-today" type="button">Idag</button>
       </div>
       <div id="calDay" class="cal-day-box"></div>
-    </section>
-  </template>
-
-  <!-- Notes -->
-  <template id="tpl-notes">
-    <section class="nt">
-      <div id="ntHero" class="kl-hero nt-hero">
-        <span class="kl-blob b1"></span><span class="kl-blob b2"></span><span class="kl-blob b3"></span>
-        <span class="kl-hero-icon" data-ic="pen"></span>
-        <div class="kl-hero-text"><small class="nt-kicker">NOTES</small><h2 id="ntTitle"></h2><p id="ntSub"></p></div>
-      </div>
-      <div class="nt-actions">
-        <button id="ntSuggest" class="kd-btn play go-blue" type="button"><span class="kd-btn-icon" data-ic="star"></span><span class="kd-btn-text"><b>Föreslå kort</b><small></small></span></button>
-        <button id="ntCopy" class="kd-btn edit" type="button"><span class="kd-btn-icon" data-ic="layers"></span><span class="kd-btn-text"><b>Kopiera allt</b><small>Hela texten till urklipp</small></span></button>
-      </div>
-      <div class="nt-paper">
-        <div id="ntTools" class="nt-tools" role="toolbar" aria-label="Formatering"></div>
-        <div class="nt-wrap">
-          <div id="ntEditor" class="nt-editor" contenteditable="true" spellcheck="true" data-placeholder="Skriv dina anteckningar här… Markera text för att låta AI:n föreslå kort." role="textbox" aria-multiline="true"></div>
-          <button id="ntPop" class="nt-pop hidden" type="button">✨ Föreslå kort av markeringen</button>
-        </div>
-        <div class="nt-foot"><span id="ntCount"></span><span id="ntStatus" class="nt-status ok">✓ Sparat</span></div>
-      </div>
     </section>
   </template>
 

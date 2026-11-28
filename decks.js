@@ -213,9 +213,6 @@ function showKortlek(id) {
   $("#kdPractice").querySelector("small").textContent = st.n ? `${st.n} kort${klChildren(id).length ? " inkl. underlekar" : ""}` : "Inga kort än";
   $("#kdImport").onclick = () => klStartPick(id);
   $("#kdEdit").onclick = () => showKlEdit(id, d.parent || null);
-  $("#kdNotes").onclick = () => showNotes(id);
-  const nn = typeof notesPreview === "function" ? notesPreview(id) : "";
-  if (nn) $("#kdNotes").querySelector("small").textContent = nn;
   const subBtn = $("#kdNewSub");
   subBtn.classList.toggle("hidden", !!d.parent);
   subBtn.onclick = () => showKlEdit(null, id);
