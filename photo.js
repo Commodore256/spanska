@@ -42,11 +42,12 @@ function showPhoto() {
   titleEl.textContent = "Från bild";
   goBack = showMyCards; reopen = showPhoto;
   render("tpl-photo", "photo");
+  for (const n of document.querySelectorAll("#view .m-name")) n.textContent = mascotName();
   const c = cfg();
   if (typeof klPaint === "function") klPaint($("#phHero"), cfgColor(c));
   $("#phHeroSub").textContent = isLanguage()
-    ? `Lía vet att du pluggar ${c.name.toLowerCase()} och läser av ord och accenter därefter.`
-    : `Lía vet att du pluggar ${c.name} och känner igen begreppen i ämnet.`;
+    ? `${mascotName()} vet att du pluggar ${c.name.toLowerCase()} och läser av ord och accenter därefter.`
+    : `${mascotName()} vet att du pluggar ${c.name} och känner igen begreppen i ämnet.`;
   if (typeof klFillIcons === "function") klFillIcons();
   let shots = [];   // bilder som dataURL
   const thumbs = $("#phThumbs"), read = $("#phRead"), result = $("#phResult"), ta = $("#phText"), status = $("#phStatus");
@@ -86,7 +87,7 @@ function showPhoto() {
     read.disabled = true;
     thumbs.classList.add("scanning");
     status.textContent = "";
-    status.append(typeof owlHead === "function" ? owlHead("think", "ph-owl") : "", el("span", "", "Lía läser av texten… det kan ta en halv minut."));
+    status.append(typeof owlHead === "function" ? owlHead("think", "ph-owl") : "", el("span", "", `${mascotName()} läser av texten… det kan ta en halv minut.`));
     status.classList.remove("hidden");
     try {
       const text = await photoOcr(shots);

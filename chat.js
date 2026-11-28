@@ -62,11 +62,14 @@ function chatMarkdown(text) {
   return out.join("");
 }
 
+// Maskotens namn (du kan döpa om den under maskoten på startsidan)
+function mName() { return typeof mascotName === "function" ? mascotName() : "Lía"; }
+function mNameHtml() { return mName().replace(/[&<>"']/g, ch => "&#" + ch.charCodeAt(0) + ";"); }
 async function aiChat(messages, c = cfg()) {
   const ai = aiConfig();
   return fetchJson(ai.url.replace(/\/+$/, ""), {
     method: "POST", headers: aiHeaders(ai),
-    body: JSON.stringify({ mode: "chat", messages, cfg: aiCfgPayload(c) })
+    body: JSON.stringify({ mode: "chat", messages, cfg: aiCfgPayload(c), name: mName() })
   }, 60000);
 }
 
@@ -74,20 +77,20 @@ async function aiChat(messages, c = cfg()) {
 const chatUI = (() => {
   const fab = el("button", "chat-fab");
   fab.type = "button";
-  fab.title = "Fråga Lía – AI-hjälp med skolarbetet";
-  fab.setAttribute("aria-label", "Öppna chatten med Lía");
+  fab.title = `Fråga ${mName()} – AI-hjälp med skolarbetet`;
+  fab.setAttribute("aria-label", "Öppna chatten med " + mName());
   const bubble = el("span", "chat-fab-bubble");
   bubble.append(owlHead("idle", "fab-owl"));
   fab.append(el("span", "chat-fab-ring"), bubble, el("span", "chat-fab-dots", "•••"));
 
   const panel = el("div", "chat-panel");
   panel.setAttribute("role", "dialog");
-  panel.setAttribute("aria-label", "Chatt med Lía");
+  panel.setAttribute("aria-label", "Chatt med " + mName());
   panel.innerHTML = `
     <div class="chat-head">
       <span class="chat-head-blob b1"></span><span class="chat-head-blob b2"></span>
       <span class="chat-avatar"></span>
-      <div class="chat-head-text"><b>Fråga Lía</b><small class="chat-sub"></small></div>
+      <div class="chat-head-text"><b>Fråga ${mNameHtml()}</b><small class="chat-sub"></small></div>
       <button class="chat-hbtn chat-clear" type="button" title="Rensa chatten för den här konfigen" aria-label="Rensa chatten">
         <svg viewBox="0 0 24 24"><path d="M3 6h18 M8 6V4h8v2 M6 6l1 14h10l1-14 M10 10v7 M14 10v7"/></svg></button>
       <button class="chat-hbtn chat-close" type="button" title="Stäng" aria-label="Stäng chatten">
@@ -99,7 +102,7 @@ const chatUI = (() => {
       <button class="chat-cam" type="button" title="Läs av en bild (foto av boken eller anteckningar)" aria-label="Bild">
         <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z M12 10.5a3.5 3.5 0 1 0 0 7a3.5 3.5 0 1 0 0-7z"/></svg></button>
       <input class="chat-file" type="file" accept="image/*" multiple hidden>
-      <textarea class="chat-input" rows="1" placeholder="Skriv till Lía…" aria-label="Meddelande"></textarea>
+      <textarea class="chat-input" rows="1" placeholder="Skriv till ${mNameHtml()}…" aria-label="Meddelande"></textarea>
       <button class="chat-send" type="submit" title="Skicka" aria-label="Skicka">
         <svg viewBox="0 0 24 24"><path d="M4 12l16-8-6 16-2.5-6.5z M11.5 13.5L20 4"/></svg></button>
     </form>`;
@@ -188,7 +191,7 @@ const chatUI = (() => {
   function welcome() {
     const c = cfg(), w = el("div", "chat-welcome");
     w.append(owlHead("wave", "welcome-owl"));
-    w.append(el("b", "", `Hej! Jag är ${typeof mascotName === "function" ? mascotName() : "Lía"} 🦉`));
+    w.append(el("b", "", `Hej! Jag är ${mName()} 🦉`));
     w.append(el("p", "", `Fråga mig vad som helst om skolarbetet. Den här chatten hör till ${c.name} – varje konfig har sin egen.`));
     const grid = el("div", "chat-suggest");
     CHAT_SUGGEST.forEach((s, i) => {
@@ -227,7 +230,12 @@ const chatUI = (() => {
     else list.forEach(m => msgsEl.append(bubbleEl(m)));
     if (busy) msgsEl.append(typingEl());
     drawChips(list);
-    input.placeholder = list.length ? "Skriv till Lía… t.ex. ”sammanfatta”" : "Skriv till Lía…";
+    const n = mName();
+    input.placeholder = list.length ? `Skriv till ${n}… t.ex. ”sammanfatta”` : `Skriv till ${n}…`;
+    panel.querySelector(".chat-head-text b").textContent = "Fråga " + n;
+    panel.setAttribute("aria-label", "Chatt med " + n);
+    fab.title = `Fråga ${n} – AI-hjälp med skolarbetet`;
+    fab.setAttribute("aria-label", "Öppna chatten med " + n);
     panel.querySelector(".chat-clear").disabled = !list.length;
     scrollDown();
   }

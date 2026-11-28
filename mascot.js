@@ -703,7 +703,7 @@ function mascotGreet(afterLogin = false) {
 (function mascotInit() {
   const first = mascotFirstRun();
   if (first) {
-    mascotEvent({ mood: "wave", big: true, title: `${phr("hi")} Jag är ${MASCOT_DEFAULT_NAME} 🦉`,
+    mascotEvent({ mood: "wave", big: true, title: `${phr("hi")} Jag är ${mascotName()} 🦉`,
       text: "En liten uggla som pluggar med dig – smart som en uggla! Du tjänar 🪙 mynt när du övar – köp kläder till mig i butiken och lås upp specialprylar med märken och utmaningar!",
       coins: coinsEarned(), button: phr("go") });
     mascotIntroShown = true;
