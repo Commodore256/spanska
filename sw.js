@@ -18,6 +18,8 @@ const FILES = [
   "./decks.js",
   "./bg.js",
   "./chat.js",
+  "./photo.js",
+  "./plan.js",
   "./manifest.json",
   "./icons/icon.svg",
   "./icons/icon-192.png",

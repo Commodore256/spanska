@@ -424,14 +424,20 @@ function klPickBanner() {
 
 // ---------- Öva en kortlek ----------
 function klPracticeDeck(id) {
-  const d = klDeck(id), list = klCards();
-  const ids = new Set(klIds(id));
+  const d = klDeck(id);
+  return klPracticeDeckIds(new Set(klIds(id)), {
+    id: "kl:" + id, klId: id, name: d?.name || "Kortlek", kind: d?.kind || "mixed", color: d?.color,
+    back: () => showKortlek(id),
+    refresh: () => klPracticeDeck(id)
+  });
+}
+// Övning med korten i flera lekar (används även av provplaneringen)
+function klPracticeDeckIds(ids, meta) {
+  const list = klCards();
   const save2 = () => saveKlCards(list);
   const mine = list.filter(c => ids.has(c.deck) && c.sv && c.es);
   return {
-    id: "kl:" + id, klId: id, name: d?.name || "Kortlek", kind: d?.kind || "mixed", color: d?.color,
-    back: () => showKortlek(id),
-    refresh: () => klPracticeDeck(id),
+    ...meta,
     items: mine.map(c => ({
       id: c.id, sv: c.sv, es: c.es,
       isYellow: () => !!c.yellow,

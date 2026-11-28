@@ -96,6 +96,9 @@ const chatUI = (() => {
     <div class="chat-msgs" aria-live="polite"></div>
     <div class="chat-chips"></div>
     <form class="chat-form" autocomplete="off">
+      <button class="chat-cam" type="button" title="Läs av en bild (foto av boken eller anteckningar)" aria-label="Bild">
+        <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z M12 10.5a3.5 3.5 0 1 0 0 7a3.5 3.5 0 1 0 0-7z"/></svg></button>
+      <input class="chat-file" type="file" accept="image/*" multiple hidden>
       <textarea class="chat-input" rows="1" placeholder="Skriv till Lía…" aria-label="Meddelande"></textarea>
       <button class="chat-send" type="submit" title="Skicka" aria-label="Skicka">
         <svg viewBox="0 0 24 24"><path d="M4 12l16-8-6 16-2.5-6.5z M11.5 13.5L20 4"/></svg></button>
@@ -149,7 +152,20 @@ const chatUI = (() => {
     const row = el("div", "chat-row " + (m.role === "user" ? "me" : "ai") + (m.error ? " err" : ""));
     if (m.role !== "user") row.append(owlHead(m.error ? "sad" : "happy", "msg-owl"));
     const b = el("div", "chat-bubble");
-    if (m.role === "user") b.textContent = m.text;
+    if (m.kind === "ocr") {
+      // Text från en bild: visas ihopfälld, tryck för att se allt
+      b.classList.add("ocr");
+      b.append(el("b", "chat-ocr-h", "📷 Text från bild"));
+      const body = el("div", "chat-ocr-body", m.text.replace(/^📷 Text från bild:\s*/, ""));
+      b.append(body);
+      if (m.text.length > 260) {
+        b.classList.add("folded");
+        const more = el("button", "chat-ocr-more", "Visa hela texten");
+        more.type = "button";
+        more.onclick = () => { const f = b.classList.toggle("folded"); more.textContent = f ? "Visa hela texten" : "Visa mindre"; };
+        b.append(more);
+      }
+    } else if (m.role === "user") b.textContent = m.text;
     else b.innerHTML = chatMarkdown(m.text);
     row.append(b);
     if (m.role !== "user" && !m.error) {
@@ -270,6 +286,41 @@ const chatUI = (() => {
     if (rows.length) playClass(rows[rows.length - 1], "chat-pop");
   };
   input.addEventListener("input", autosize);
+  // 📷 Läs av en bild direkt i chatten: texten läggs in i samtalet, sen skriver du vad du vill (t.ex. "sammanfatta")
+  const cam = panel.querySelector(".chat-cam"), file = panel.querySelector(".chat-file");
+  cam.onclick = () => { if (!aiEnabled()) { toast("AI:n är inte kopplad"); return; } file.click(); };
+  file.onchange = async () => {
+    const files = [...file.files].slice(0, 4); file.value = "";
+    if (!files.length || busy || typeof photoOcr !== "function") return;
+    busy = true; cam.disabled = sendBtn.disabled = true; setAvatar("think"); fab.classList.add("thinking");
+    draw();
+    const row = msgsEl.querySelector(".chat-row.typing .chat-bubble");
+    if (row) row.after(el("small", "chat-ocr-wait", `Läser av ${files.length === 1 ? "bilden" : files.length + " bilder"}…`));
+    try {
+      const text = await photoOcr(files);
+      addContext(text);
+      input.placeholder = "Vad ska jag göra med texten? T.ex. ”sammanfatta”";
+      input.focus();
+    } catch (e) { toast("⚠ " + (e.message || e)); }
+    busy = false; cam.disabled = sendBtn.disabled = false; fab.classList.remove("thinking"); setAvatar("happy");
+    draw();
+    input.placeholder = "Vad ska jag göra med texten? T.ex. ”sammanfatta”";
+  };
+  // Lägger in text (t.ex. från en bild) i samtalet utan att fråga något än
+  function addContext(text) {
+    const list = chatLoad();
+    list.push({ id: chatId(), role: "user", kind: "ocr", text: "📷 Text från bild:\n\n" + text, at: Date.now() });
+    chatSave(list);
+  }
+  // Skickar ett meddelande som om du skrivit det
+  function sendText(text) {
+    if (!aiEnabled()) { toast("AI:n är inte kopplad – logga in eller fyll i AI-koppling under ⚙"); return; }
+    const list = chatLoad();
+    list.push({ id: chatId(), role: "user", text, at: Date.now() });
+    chatSave(list);
+    if (!open) show(); else draw();
+    ask();
+  }
   input.addEventListener("keydown", e => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
     if (e.key === "Escape") close();
@@ -309,7 +360,8 @@ const chatUI = (() => {
   }, 18000);
 
   return {
-    show, close, draw,
+    show, close, draw, send: sendText,
+    context(text) { addContext(text); if (!open) show(); else draw(); input.focus(); },
     // Byter du konfig medan chatten är öppen visas den konfigens historik
     onView() { if (open && shownFor !== activeId) draw(); fab.querySelector(".chat-fab-bubble").replaceChildren(owlHead("idle", "fab-owl")); }
   };

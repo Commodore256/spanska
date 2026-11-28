@@ -145,6 +145,7 @@
         </div>
         <p id="addHelp" class="muted small">Skriv i en ruta eller båda. Tom ruta fylls i automatiskt. Stavfel markeras gult så du kan rätta dem sen.</p>
       </form>
+      <button id="btnPhoto" class="kd-btn photo-btn" type="button"><span class="kd-btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z M12 10.5a3.5 3.5 0 1 0 0 7a3.5 3.5 0 1 0 0-7z"/></svg></span><span class="kd-btn-text"><b>Från bild</b><small>Fota boken eller anteckningar – gör kort, sammanfatta eller få svar</small></span><span class="kd-btn-go" data-ic="arrow"></span></button>
       <button id="btnImport" class="btn import-btn">Importera flashcards från text 📋</button>
 
       <div class="search-row">
@@ -465,6 +466,67 @@
       </div>
 
       <div class="row"><button id="bgReset" class="btn secondary" type="button">↺ Återställ till standard</button></div>
+    </section>
+  </template>
+
+  <!-- Från bild -->
+  <template id="tpl-photo">
+    <section class="ph">
+      <div id="phHero" class="kl-hero ph-hero">
+        <span class="kl-blob b1"></span><span class="kl-blob b2"></span><span class="kl-blob b3"></span>
+        <span class="kl-hero-icon"><svg viewBox="0 0 24 24" width="46%" height="46%" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z M12 10.5a3.5 3.5 0 1 0 0 7a3.5 3.5 0 1 0 0-7z"/></svg></span>
+        <div class="kl-hero-text"><h2>Från bild</h2><p>Fota en sida i boken, ett arbetsblad eller dina anteckningar. <span id="phHeroSub"></span></p></div>
+      </div>
+      <div class="ph-pick">
+        <button id="phCamera" class="kd-btn import" type="button"><span class="kd-btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z M12 10.5a3.5 3.5 0 1 0 0 7a3.5 3.5 0 1 0 0-7z"/></svg></span><span class="kd-btn-text"><b>Ta en bild</b><small>Med kameran</small></span></button>
+        <button id="phPick" class="kd-btn sub" type="button"><span class="kd-btn-icon" data-ic="layers"></span><span class="kd-btn-text"><b>Välj bilder</b><small>Upp till 4 sidor</small></span></button>
+      </div>
+      <input id="phFileCam" type="file" accept="image/*" capture="environment" hidden>
+      <input id="phFile" type="file" accept="image/*" multiple hidden>
+      <div id="phThumbs" class="ph-thumbs hidden"></div>
+      <button id="phRead" class="kd-btn play go-blue ph-read hidden" type="button"><span class="kd-btn-icon" data-ic="star"></span><span class="kd-btn-text"><b>Läs av texten</b><small></small></span></button>
+      <p id="phStatus" class="ph-status hidden"></p>
+      <div id="phResult" class="ph-result hidden">
+        <h3 class="kd-h"><span class="kd-h-ic" data-ic="pen"></span>Texten Lía läste av <small class="muted">(du kan rätta den)</small></h3>
+        <textarea id="phText" rows="10" spellcheck="false"></textarea>
+        <h3 class="kd-h"><span class="kd-h-ic" data-ic="bulb"></span>Vad vill du göra?</h3>
+        <div class="ph-actions">
+          <button id="phCards" class="kd-btn play" type="button"><span class="kd-btn-icon" data-ic="layers"></span><span class="kd-btn-text"><b>Gör flashcards</b><small>Lía plockar ut begreppen – du sveper</small></span></button>
+          <button id="phSummary" class="kd-btn import" type="button"><span class="kd-btn-icon" data-ic="pen"></span><span class="kd-btn-text"><b>Sammanfatta</b><small>Det viktigaste i en punktlista</small></span></button>
+          <button id="phAnswer" class="kd-btn sub" type="button"><span class="kd-btn-icon" data-ic="help"></span><span class="kd-btn-text"><b>Svara på frågorna</b><small>Lía besvarar frågorna i texten</small></span></button>
+          <button id="phAsk" class="kd-btn edit" type="button"><span class="kd-btn-icon" data-ic="speech"></span><span class="kd-btn-text"><b>Fråga något annat</b><small>Texten följer med till chatten</small></span></button>
+        </div>
+        <div class="row"><button id="phClear" class="btn secondary" type="button">🧹 Börja om</button></div>
+      </div>
+    </section>
+  </template>
+
+  <!-- Plugga inför -->
+  <template id="tpl-plan">
+    <section class="pl">
+      <div class="kl-hero pl-hero">
+        <span class="kl-blob b1"></span><span class="kl-blob b2"></span><span class="kl-blob b3"></span>
+        <span class="kl-hero-icon"><svg viewBox="0 0 24 24" width="46%" height="46%" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5z M6 12v5c3 2 9 2 12 0v-5 M22 10v6"/></svg></span>
+        <div class="kl-hero-text"><h2>Plugga inför</h2><p id="plHeroSub"></p></div>
+      </div>
+      <button id="plCal" class="kd-btn plan-btn" type="button"><span class="kd-btn-icon" data-ic="calendar"></span><span class="kd-btn-text"><b>Öppna kalendern</b><small>Tryck på en dag för att lägga in ett prov</small></span><span class="kd-btn-go" data-ic="arrow"></span></button>
+      <div id="plList" class="pl-list"></div>
+    </section>
+  </template>
+
+  <!-- Kalender -->
+  <template id="tpl-cal">
+    <section class="cal">
+      <div id="calHero" class="cal-box">
+        <div class="cal-head">
+          <button id="calPrev" class="cal-nav" type="button" aria-label="Förra månaden">‹</button>
+          <b id="calMonth" class="cal-month"></b>
+          <button id="calNext" class="cal-nav" type="button" aria-label="Nästa månad">›</button>
+        </div>
+        <div id="calGrid" class="cal-grid"></div>
+        <button id="calToday" class="cal-today" type="button">Idag</button>
+      </div>
+      <div id="calDay" class="cal-day-box"></div>
     </section>
   </template>
 
@@ -855,5 +917,7 @@
   <script src="decks.js"></script>
   <script src="bg.js"></script>
   <script src="chat.js"></script>
+  <script src="photo.js"></script>
+  <script src="plan.js"></script>
 </body>
 </html>
