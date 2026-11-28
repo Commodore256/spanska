@@ -1,2 +1,2 @@
 // Ändras automatiskt av publicera.bat – ändra inte för hand.
-const APP_VERSION = 50;
+const APP_VERSION = 51;

@@ -1934,3 +1934,9 @@ body.has-bg .lead, body.has-bg .home > .muted, body.has-bg h2, body.has-bg h3 { 
 .bg-preview.original::after { display: none; }
 .bgv.is-original .bg-sect, .bgv.is-original #bgTypes, .bgv.is-original .bg-frost, .bgv.is-original .bg-scope { opacity: .45; }
 .bg-original { margin-bottom: 14px; border: 2px solid color-mix(in srgb, #845ef7 40%, transparent); }
+/* Konfig-etiketten: konfigens färg, alltid tydlig */
+.cfg-badge { color: var(--tbText, var(--tb2)) !important; background: #fff; border: 2px solid var(--tb1, var(--red)); font-size: .78rem; font-weight: 900;
+  padding: 2px 11px; text-shadow: none; opacity: 1; letter-spacing: .01em; }
+.topbar.clear .cfg-badge { background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+.topbar.clear { color: #fff; }
+.topbar.clear h1 #title, .topbar.clear .version { text-shadow: 0 1px 2px rgba(0,0,0,.55), 0 0 10px rgba(0,0,0,.35); }

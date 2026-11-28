@@ -3496,6 +3496,12 @@ function paintTopbar() {
   bar.style.setProperty("--tb1", col);
   bar.style.setProperty("--tb2", hexShade(col, -0.28));
   bar.style.setProperty("--tb3", hexShade(col, 0.45));
+  // Textfärg i konfigens färg som alltid syns mot vitt: gör färgen mörkare tills kontrasten räcker
+  const lum = hex => { const n = parseInt(hex.slice(1), 16), f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * f(n >> 16) + 0.7152 * f((n >> 8) & 255) + 0.0722 * f(n & 255); };
+  let txt = /^#[0-9a-f]{6}$/i.test(col) ? col : "#c0392b", step = 0;
+  while ((1.05) / (lum(txt) + 0.05) < 5 && step++ < 12) txt = hexShade(txt, -0.12);
+  bar.style.setProperty("--tbText", txt);
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", hexShade(col, -0.1));
   const badge = document.getElementById("cfgBadge");
   badge.textContent = `${c.icon || "📘"} ${c.name}`;
