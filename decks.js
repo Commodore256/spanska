@@ -213,6 +213,9 @@ function showKortlek(id) {
   $("#kdPractice").querySelector("small").textContent = st.n ? `${st.n} kort${klChildren(id).length ? " inkl. underlekar" : ""}` : "Inga kort än";
   $("#kdImport").onclick = () => klStartPick(id);
   $("#kdEdit").onclick = () => showKlEdit(id, d.parent || null);
+  $("#kdNotes").onclick = () => showNotes(id);
+  const nn = typeof notesPreview === "function" ? notesPreview(id) : "";
+  if (nn) $("#kdNotes").querySelector("small").textContent = nn;
   const subBtn = $("#kdNewSub");
   subBtn.classList.toggle("hidden", !!d.parent);
   subBtn.onclick = () => showKlEdit(null, id);
@@ -367,6 +370,15 @@ function showKlEdit(id, parentId) {
 
 // ---------- Importera från Mina kort ----------
 let klPick = null, klPickAdded = 0;
+// När kort skapas från en kortleks anteckningar läggs en kopia i kortleken (se runSwipe i app.js)
+let klImportTarget = null;
+function klAddFromImport(c) {
+  if (!klImportTarget || !klDeck(klImportTarget) || !c.sv || !c.es) return null;
+  const list = klCards(), id = klNewId();
+  list.push({ id, src: c.id, deck: klImportTarget, sv: c.sv, es: c.es, added: Date.now(), box: 0, seen: 0, right: 0, wrong: 0, lastSeen: 0 });
+  saveKlCards(list);
+  return id;
+}
 function klStartPick(deckId) {
   klPick = deckId; klPickAdded = 0;
   showMyCards();
@@ -472,6 +484,7 @@ function klPracticeBanner(deck) {
 // ---------- Kopplingar ----------
 function klViewChange(name) {
   if (name !== "mycards") klPick = null;
+  if (!["import", "swipe", "swipe-done"].includes(name)) klImportTarget = null;
   setTimeout(() => {
     if (currentView !== name) return;
     const tops = klDecks().filter(d => !d.parent), n = klCards().length;

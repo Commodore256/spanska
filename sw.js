@@ -20,6 +20,7 @@ const FILES = [
   "./chat.js",
   "./photo.js",
   "./plan.js",
+  "./notes.js",
   "./manifest.json",
   "./icons/icon.svg",
   "./icons/icon-192.png",
@@ -50,6 +51,7 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
   const req = event.request;
   if (req.method !== "GET" || new URL(req.url).origin !== self.location.origin) return;
+  if (/\.(mp4|webm)$/i.test(new URL(req.url).pathname)) return;   // videor hämtas i bitar av webbläsaren
   event.respondWith(
     fetch(req.url, { cache: "no-cache" })
       .then(resp => {

@@ -1749,7 +1749,9 @@ function runSwipe(terms, usedAi, notice) {
         if (usedAi && t.sv && t.es) { c.check = { status: "ok", byAi: true }; c.filledBy = "ai"; }
         else if (t.sv && t.es) { c.check = { status: "unchecked" }; c.filled = t.filled || null; c.filledBy = t.by || null; }
         cards.unshift(c); saveCards();
-        history.push({ cardId: c.id }); added++;
+        // Kom importen från en kortleks anteckningar? Då hamnar en kopia i kortleken också
+        const klId = typeof klAddFromImport === "function" ? klAddFromImport(c) : null;
+        history.push({ cardId: c.id, klId }); added++;
         burst(stack, ["💚", "✨", "⭐", "💛"], 10);
       } else history.push({ cardId: null });
       index++; busy = false;
@@ -1762,6 +1764,7 @@ function runSwipe(terms, usedAi, notice) {
     if (busy || !history.length) return;
     const h = history.pop();
     if (h.cardId) { cards = cards.filter(c => c.id !== h.cardId); saveCards(); added--; }
+    if (h.klId && typeof klCards === "function") saveKlCards(klCards().filter(c => c.id !== h.klId));
     index--;
     show();
   }

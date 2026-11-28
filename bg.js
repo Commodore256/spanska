@@ -17,6 +17,17 @@ const BG_STYLES = [
   { id: "radial", name: "Cirkel" }, { id: "spot", name: "Spotlight" }, { id: "blobs", name: "Bubblor" },
   { id: "conic", name: "Virvel" }, { id: "flow", name: "Rörlig" }
 ];
+// Färdiga bakgrunder som alla kan välja. Rörliga bakgrunder är korta videor i mappen bakgrunder/
+// som spelas utan ljud och går runt i en loop.
+const BG_PRESETS = [
+  { id: "rain", name: "Regn", video: "bakgrunder/regn.mp4", poster: "bakgrunder/regn.jpg", frost: false, tag: "Rörlig" },
+  { id: "sunset", name: "Solnedgång", grad: ["#ff8787", "#5f3dc4"], style: "down" },
+  { id: "ocean", name: "Hav", grad: ["#22b8cf", "#1864ab"], style: "flow", tag: "Rörlig" },
+  { id: "forest", name: "Skog", grad: ["#8ce99a", "#2b8a3e"], style: "blobs" },
+  { id: "candy", name: "Godis", grad: ["#f783ac", "#74c0fc"], style: "conic" },
+  { id: "night", name: "Natthimmel", grad: ["#5f3dc4", "#0b1023"], style: "spot" },
+  { id: "spain", name: "España", grad: ["#ffd43b", "#e03131"], style: "radial" }
+];
 const BG_DEFAULT = { type: "none", c1: "#845ef7", c2: "#22b8cf", style: "diag", frost: false, img: null, clearTop: false, original: false };
 
 function bgCss(s) {
@@ -25,6 +36,12 @@ function bgCss(s) {
   if (s.type === "image") {
     const data = s.img ? load("app.bgimg." + s.img, null) : null;
     return data ? `center / cover no-repeat url("${data}")` : "var(--bg)";
+  }
+  if (s.type === "preset") {
+    const p = BG_PRESETS.find(x => x.id === s.preset);
+    if (!p) return "";
+    if (p.video) return `center / cover no-repeat url("${p.poster}"), #10141c`;
+    return bgCss({ type: "gradient", c1: p.grad[0], c2: p.grad[1], style: p.style });
   }
   if (s.type !== "gradient") return "";
   return {
@@ -63,9 +80,31 @@ function applyBg() {
   // Genomskinlig topplist: bakgrunden syns över hela skärmen
   document.querySelector(".topbar")?.classList.toggle("clear", on && !!s.clearTop);
   layer.classList.toggle("frost", on && !!s.frost);
-  layer.classList.toggle("flow", on && s.type === "gradient" && s.style === "flow");
+  const preset = s.type === "preset" ? BG_PRESETS.find(x => x.id === s.preset) : null;
+  layer.classList.toggle("flow", on && ((s.type === "gradient" && s.style === "flow") || (preset && !preset.video && preset.style === "flow")));
   layer.style.background = on ? css : "";
+  // Rörlig bakgrund: en video utan ljud som går runt i en loop
+  let vid = layer.querySelector("video");
+  if (on && preset?.video) {
+    if (!vid) {
+      vid = document.createElement("video");
+      Object.assign(vid, { muted: true, loop: true, playsInline: true, autoplay: true, preload: "auto" });
+      vid.setAttribute("muted", ""); vid.setAttribute("playsinline", "");
+      vid.onerror = () => { vid.remove(); };
+      layer.prepend(vid);
+    }
+    if (!vid.src.endsWith(preset.video)) { vid.poster = preset.poster; vid.src = preset.video; }
+    bgVideoPlayState();
+  } else if (vid) vid.remove();
 }
+// Videon spelas bara när appen syns och animationer är på (sparar batteri)
+function bgVideoPlayState() {
+  const vid = document.querySelector("#bgLayer video");
+  if (!vid) return;
+  const play = !document.hidden && animOn() && !document.body.classList.contains("adv-bg");
+  if (play) vid.play().catch(() => {}); else vid.pause();
+}
+document.addEventListener("visibilitychange", bgVideoPlayState);
 
 // Bild från datorn/telefonen → mindre JPEG, så att den får plats i webbläsarens minne
 function bgReadImage(file) {
@@ -105,7 +144,14 @@ function showBg() {
     const s = bgSettings();
     // Förhandsvisning
     const css = bgCss(s);
-    prev.querySelector(".bgp-fill").style.background = s.type !== "none" && css ? css : "";
+    const fill = prev.querySelector(".bgp-fill");
+    fill.style.background = s.type !== "none" && css ? css : "";
+    const pp = s.type === "preset" ? BG_PRESETS.find(x => x.id === s.preset) : null;
+    let pv = fill.querySelector("video");
+    if (pp?.video) {
+      if (!pv) { pv = document.createElement("video"); Object.assign(pv, { muted: true, loop: true, playsInline: true, autoplay: animOn() }); pv.setAttribute("muted", ""); pv.setAttribute("playsinline", ""); fill.append(pv); }
+      if (!pv.src.endsWith(pp.video)) { pv.src = pp.video; pv.poster = pp.poster; }
+    } else if (pv) pv.remove();
     prev.classList.toggle("frost", s.type !== "none" && !!s.frost);
     prev.classList.toggle("flow", s.type === "gradient" && s.style === "flow");
     // Bara den här konfigen
@@ -113,6 +159,7 @@ function showBg() {
     $("#bgScopeText").textContent = bgPerConfig() ? `Gäller bara ${c.name}. Andra konfiger har sin egen bakgrund.` : "Gäller alla konfiger. Slå på för att ge den här konfigen en egen bakgrund.";
     // Typ
     view.querySelectorAll(".bg-type").forEach(b => b.classList.toggle("on", b.dataset.type === s.type));
+    view.querySelectorAll(".bg-preset").forEach(b => b.classList.toggle("on", s.type === "preset" && b.dataset.preset === s.preset));
     $("#bgSolid").classList.toggle("hidden", s.type !== "solid");
     $("#bgGrad").classList.toggle("hidden", s.type !== "gradient");
     $("#bgImage").classList.toggle("hidden", s.type !== "image");
@@ -142,6 +189,31 @@ function showBg() {
     $("#bgImgRemove").classList.toggle("hidden", !imgData);
   }
   const update = patch => { bgSave({ ...bgSettings(), ...patch }); draw(); };
+
+  // Färdiga bakgrunder
+  const presets = $("#bgPresets");
+  BG_PRESETS.forEach((p, i) => {
+    const b = el("button", "bg-preset"); b.type = "button"; b.dataset.preset = p.id; b.style.setProperty("--i", i);
+    const sw = el("span", "bg-preset-swatch");
+    if (p.video) {
+      sw.style.background = `center / cover url("${p.poster}"), #10141c`;
+      const v = document.createElement("video");
+      Object.assign(v, { muted: true, loop: true, playsInline: true, autoplay: animOn(), preload: "metadata" });
+      v.setAttribute("muted", ""); v.setAttribute("playsinline", "");
+      v.src = p.video; v.poster = p.poster;
+      v.onerror = () => { b.classList.add("missing"); b.title = "Videon saknas i appen än"; };
+      sw.append(v);
+    } else sw.style.background = bgCss({ type: "gradient", c1: p.grad[0], c2: p.grad[1], style: p.style });
+    if (!p.video && p.style === "flow") sw.classList.add("flow");
+    b.append(sw, el("b", "", p.name));
+    if (p.tag) b.append(el("span", "bg-preset-tag", "▶ " + p.tag));
+    b.onclick = () => {
+      if (b.classList.contains("missing")) { toast("Den rörliga bakgrunden finns inte i appen än"); return; }
+      update({ type: "preset", preset: p.id, frost: p.frost ?? bgSettings().frost });
+      playClass(b, "pop");
+    };
+    presets.append(b);
+  });
 
   // Typer
   const types = $("#bgTypes");
